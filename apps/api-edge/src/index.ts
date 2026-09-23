@@ -6,7 +6,12 @@ import { handlePreflight, applyCorsHeaders } from "./cors";
 import { isAuthRoute, handleAuthRoute } from "./auth-facade";
 import { isOrgRoute, handleOrgRoute } from "./org-facade";
 import { isProjectRoute, handleProjectRoute } from "./project-facade";
-import { isExpiryRoute, handleExpiryRoute } from "./expiry-facade";
+import {
+  isExpiryRoute,
+  handleExpiryRoute,
+  isExpiryIngressRoute,
+  handleExpiryIngressRoute,
+} from "./expiry-facade";
 import { isAuditRoute, handleAuditRoute } from "./audit-facade";
 import { isConfigRoute, handleConfigRoute } from "./config-facade";
 import { isWebhooksRoute, handleWebhooksRoute } from "./webhooks-facade";
@@ -51,6 +56,10 @@ export default {
       response = await handleAuditRoute(request, env, requestId, url.pathname);
     } else if (isConfigRoute(url.pathname)) {
       response = await handleConfigRoute(request, env, requestId, url.pathname);
+    } else if (isExpiryIngressRoute(url.pathname)) {
+      // Expirio EX3: the renewal link and the calendar feed (no session) —
+      // authenticated by the opaque token, verified by hash in expiry-worker.
+      response = await handleExpiryIngressRoute(request, env, requestId, url.pathname);
     } else if (isIntegrationsIngressRoute(url.pathname)) {
       // Public install-callback ingress (no session) — authenticated by the
       // signed single-use state verified in integrations-worker.
