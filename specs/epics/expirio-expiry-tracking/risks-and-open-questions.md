@@ -49,7 +49,9 @@ for `env.stage` and `env.prod`. No new secret is needed — Workers AI is a bind
 like `send_email`. With that in place the extraction is one handler that reads the
 R2 object EX3 already stores and returns a draft item for the operator to confirm;
 it is a milestone (EX4), not a redesign, because EX3 deliberately stores the
-document first and asks the questions second. Until then the risk is competitive,
+document first and asks the questions second. As shipped (#11) the object is at
+`expirio-documents-<env>` under `<org>/<item>/<document>`, and its row in
+`expiry_documents` carries the content type and SHA-256 an extractor would need. Until then the risk is competitive,
 not technical: "setup takes minutes" is carried by the vertical templates alone.
 
 ## EX-D — vertical templates as code, not data (ACCEPTED)
