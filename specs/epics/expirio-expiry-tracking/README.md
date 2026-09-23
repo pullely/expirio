@@ -22,14 +22,14 @@ one-off upload link to renew a card without an account, a password or a seat.
 
 | Field | Value |
 |-------|-------|
-| Status | In progress |
+| Status | ✅ Shipped |
 | Cluster | **EX** (EX0–EX3) |
 | Owner(s) | `apps/expiry-worker` (the resource, the clock) · `apps/api-edge` (the facade and the public ingress) · `packages/db` + `packages/contracts` + `packages/sdk` (persistence and the wire) · `apps/notifications-worker` (the reminder emails) · `apps/web-console-next` (the surface) |
 | Builds on | `cirrus baseline-v12` — extends identity, membership/RBAC, projects (as *locations*), events/audit, notifications, webhooks, metering and billing entitlements without forking any of them |
 | Changes | Adds one bounded context (`expiry`), one worker, one R2 bucket and three public ingress routes; touches api-edge dispatch, the policy tables, the notification template map and the console nav. No existing table, route or contract changes shape. |
 | Decisions locked | (1) A cirrus **project is a location** — no second tenancy axis. (2) Reminders are **materialised rows**, scheduled once at item write and swept by cron, so a resend is an idempotency violation rather than a race. (3) The public surfaces (renewal link, ICS feed) are **opaque bearer tokens stored as hashes**, verified inside `expiry-worker`, never at the edge. (4) Manual credential entry is the only intake in this epic; **AI extraction is deliberately deferred** (EX-C). |
 | Gate | EX1 is invisible — the resource, its API and its SDK, with no console surface. EX2 is the first user-visible change. |
-| Shipped as | |
+| Shipped as | #8 (EX0, the spec) · #9 (EX1, the item and its clock) · #10 (EX2, templates, the sweep, the scorecard — with the cirrus D1 fix) · #11 (EX3, documents, the renewal link, the feed) on `github.com/pullely/expirio` |
 
 ## Read order
 
