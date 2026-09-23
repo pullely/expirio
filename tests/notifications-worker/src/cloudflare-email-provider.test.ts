@@ -228,3 +228,23 @@ describe("resolveProvider cloudflare-email wiring", () => {
     expect(resolveProvider(env).name).toBe("local-debug");
   });
 });
+
+describe("expiry reminder templates (Expirio EX2)", () => {
+  it("renders each tier, escalating in tone, and escapes the item name", () => {
+    const data = { itemName: "DEA <registration>", expiresOn: "2026-10-31", daysRemaining: 30 };
+    const holder = renderEmailTemplate("expiry.reminder.holder", data, { brandName: "Expirio" });
+    const manager = renderEmailTemplate("expiry.reminder.manager", data);
+    const owner = renderEmailTemplate("expiry.reminder.owner", { ...data, daysRemaining: 0 });
+    expect(holder?.subject).toBe("[Expirio] DEA <registration> expires in 30 days");
+    expect(manager?.subject).toMatch(/^Action needed:/);
+    expect(owner?.subject).toMatch(/^Escalation: .* expires today$/);
+    expect(holder?.html).toContain("DEA &lt;registration&gt;");
+    expect(holder?.html).not.toContain("<registration>");
+    expect(owner?.text).toMatch(/last rung/);
+  });
+
+  it("says how long ago a lapsed item expired", () => {
+    const r = renderEmailTemplate("expiry.reminder.owner", { itemName: "OSHA 10", daysRemaining: -3 });
+    expect(r?.subject).toBe("Escalation: OSHA 10 expired 3 days ago");
+  });
+});

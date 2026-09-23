@@ -68,7 +68,10 @@ export function buildNavSections(scope: NavScope, soloMode: boolean = SOLO_MODE)
             { href: `${orgBase}/settings`, label: "Settings", icon: "Settings", subPanel: true },
           ]
         : [
-            { href: `${orgBase}/projects`, label: "Projects", icon: "FolderKanban" },
+            // Expirio: the register and the scorecard are the product surface.
+            { href: `${orgBase}/expiry`, label: "Expiry register", icon: "CalendarClock" },
+            { href: `${orgBase}/expiry/scorecard`, label: "Scorecard", icon: "ShieldCheck" },
+            { href: `${orgBase}/projects`, label: "Locations", icon: "FolderKanban" },
             { href: `${orgBase}/usage`, label: "Usage & quota", icon: "Gauge" },
             // Opens the dedicated settings panel — flagged so the renderer shows a ›.
             { href: `${orgBase}/settings`, label: "Settings", icon: "Settings", subPanel: true },
