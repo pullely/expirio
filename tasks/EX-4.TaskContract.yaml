@@ -1,0 +1,27 @@
+apiVersion: orun.io/v1
+kind: TaskContract
+metadata:
+  name: EX-4
+spec:
+  goal: Certificate documents are stored in R2 and read back through expiry-worker, a holder can renew an item from a single-use link with no account, and a location's upcoming expiries are published as a revocable ICS calendar feed.
+  affects:
+    - default/expirio/cloudflare-r2
+    - default/expirio/db
+    - default/expirio/db-tests
+    - default/expirio/db-migrate
+    - default/expirio/contracts
+    - default/expirio/contracts-tests
+    - default/expirio/sdk
+    - default/expirio/expiry-worker
+    - default/expirio/expiry-worker-tests
+    - default/expirio/api-edge
+    - default/expirio/api-edge-tests
+    - default/expirio/web-console-next
+    - default/expirio/web-console-next-tests
+  doneWhen:
+    - migration 210_expiry_edges is applied on stage and prod
+    - a PDF uploaded to an item reads back byte-identical through the documents content route, and another org's document id answers not_found
+    - GET /ingress/expirio/renew?token= answers 200 with no Authorization header, and not_found once the link is consumed
+    - GET /ingress/expirio/calendar.ics?token= answers text/calendar, and not_found for a revoked token
+    - the README status is Shipped and Shipped as names the PRs
+  gates: []
