@@ -1,0 +1,33 @@
+apiVersion: orun.io/v1
+kind: TaskContract
+metadata:
+  name: EX-2
+spec:
+  goal: The expiry bounded context exists — tracked items and their materialised 90/60/30/7/0 reminder ladder, served through api-edge on stage and prod.
+  # Component names, not paths: `orun task check` resolves the diff to components
+  # and compares those. The three that look surprising are deliberate —
+  # identity-worker, membership-worker and web-console-next carry the SOLO_MODE
+  # switch, and Expirio is multi-tenant (locations are projects, the ladder's
+  # last rung is the org owner), so the Solo profile has to be off for the
+  # product to work at all.
+  affects:
+    - default/expirio/db
+    - default/expirio/db-tests
+    - default/expirio/db-migrate
+    - default/expirio/contracts
+    - default/expirio/sdk
+    - default/expirio/policy-engine
+    - default/expirio/policy-engine-tests
+    - default/expirio/expiry-worker
+    - default/expirio/expiry-worker-tests
+    - default/expirio/api-edge
+    - default/expirio/events-worker
+    - default/expirio/identity-worker
+    - default/expirio/membership-worker
+    - default/expirio/web-console-next
+  doneWhen:
+    - migration 200_expiry_core is registered in the manifest and replays green against node:sqlite
+    - POST and GET /v1/organizations/{org}/expiry-items answer through api-edge on stage and prod
+    - creating an item materialises its pending reminder rows, unique per (item_id, offset_days)
+    - an unauthorized subject receives not_found rather than forbidden
+  gates: []

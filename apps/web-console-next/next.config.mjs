@@ -38,10 +38,11 @@ const nextConfig = {
   },
   env: {
     NEXT_PUBLIC_DEPLOY_ENV: process.env.NEXT_PUBLIC_DEPLOY_ENV ?? "",
-    // M0 / Solo profile (Expirio ships single-user). Build with
-    // NEXT_PUBLIC_SOLO_MODE=false to restore the full multi-tenant baseline.
-    // See specs/profiles/solo-m0.md.
-    NEXT_PUBLIC_SOLO_MODE: process.env.NEXT_PUBLIC_SOLO_MODE ?? "true",
+    // Expirio is multi-tenant B2B, not single-user: a clinic's locations are
+    // cirrus PROJECTS, the people chased are org MEMBERS, and the escalation
+    // ladder's last rung is the org owner. The Solo profile suppresses all
+    // three at the edge, so it is off. See specs/profiles/solo-m0.md.
+    NEXT_PUBLIC_SOLO_MODE: process.env.NEXT_PUBLIC_SOLO_MODE ?? "false",
   },
 };
 

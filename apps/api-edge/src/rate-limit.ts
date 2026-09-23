@@ -57,7 +57,8 @@ export type RouteFamily =
   | "billing"
   | "audit"
   | "notifications"
-  | "integrations";
+  | "integrations"
+  | "expiry";
 
 interface BucketLimits {
   /** Bucket capacity (max tokens). */
@@ -91,6 +92,13 @@ const LIMITS: Record<RouteFamily, FamilyConfig> = {
   project: {
     identity: { limit: 60, windowSec: 60 },
     org: { limit: 300, windowSec: 60 },
+  },
+  // A compliance register is imported in bursts — a clinic onboarding forty
+  // staff certifications types faster than it reads — so the identity bucket
+  // is wider than the CRUD families around it.
+  expiry: {
+    identity: { limit: 120, windowSec: 60 },
+    org: { limit: 600, windowSec: 60 },
   },
   config: {
     identity: { limit: 60, windowSec: 60 },

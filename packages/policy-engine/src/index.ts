@@ -57,6 +57,11 @@ const ORG_ROLE_PERMISSIONS: Record<OrganizationRole, readonly string[]> = {
     "organization.integration.manage",
     "organization.integration.token.issue",
     "project.repo_link.write",
+    "expiry.item.read",
+    "expiry.item.create",
+    "expiry.item.update",
+    "expiry.item.renew",
+    "expiry.item.delete",
   ],
   admin: [
     "organization.read",
@@ -98,6 +103,11 @@ const ORG_ROLE_PERMISSIONS: Record<OrganizationRole, readonly string[]> = {
     "organization.integration.manage",
     "organization.integration.token.issue",
     "project.repo_link.write",
+    "expiry.item.read",
+    "expiry.item.create",
+    "expiry.item.update",
+    "expiry.item.renew",
+    "expiry.item.delete",
   ],
   builder: [
     "organization.read",
@@ -114,6 +124,10 @@ const ORG_ROLE_PERMISSIONS: Record<OrganizationRole, readonly string[]> = {
     "project.webhook.read",
     "organization.metering.read",
     "organization.integration.read",
+    "expiry.item.read",
+    "expiry.item.create",
+    "expiry.item.update",
+    "expiry.item.renew",
   ],
   viewer: [
     "organization.read",
@@ -126,6 +140,7 @@ const ORG_ROLE_PERMISSIONS: Record<OrganizationRole, readonly string[]> = {
     "project.webhook.read",
     "organization.metering.read",
     "organization.integration.read",
+    "expiry.item.read",
   ],
   billing_admin: [
     "organization.read",
@@ -151,6 +166,11 @@ const PROJECT_ROLE_PERMISSIONS: Record<ProjectRole, readonly string[]> = {
     "project.config.write",
     "project.webhook.read",
     "project.webhook.write",
+    "expiry.item.read",
+    "expiry.item.create",
+    "expiry.item.update",
+    "expiry.item.renew",
+    "expiry.item.delete",
   ],
   project_builder: [
     "project.read",
@@ -160,12 +180,17 @@ const PROJECT_ROLE_PERMISSIONS: Record<ProjectRole, readonly string[]> = {
     "environment.update",
     "project.config.read",
     "project.webhook.read",
+    "expiry.item.read",
+    "expiry.item.create",
+    "expiry.item.update",
+    "expiry.item.renew",
   ],
   project_viewer: [
     "project.read",
     "environment.read",
     "project.config.read",
     "project.webhook.read",
+    "expiry.item.read",
   ],
 };
 
@@ -203,6 +228,11 @@ const PROJECT_GRANTABLE_ACTIONS: ReadonlySet<string> = new Set([
   "organization.api_key.create",
   "organization.api_key.list",
   "organization.api_key.revoke",
+  "expiry.item.read",
+  "expiry.item.create",
+  "expiry.item.update",
+  "expiry.item.renew",
+  "expiry.item.delete",
 ]);
 
 const ALL_KNOWN_ACTIONS: ReadonlySet<string> = new Set([
@@ -247,6 +277,11 @@ const ALL_KNOWN_ACTIONS: ReadonlySet<string> = new Set([
   "organization.integration.manage",
   "organization.integration.token.issue",
   "project.repo_link.write",
+  "expiry.item.read",
+  "expiry.item.create",
+  "expiry.item.update",
+  "expiry.item.renew",
+  "expiry.item.delete",
 ]);
 
 function isOrgRole(role: string): role is OrganizationRole {

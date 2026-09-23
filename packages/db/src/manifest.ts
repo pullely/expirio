@@ -183,5 +183,14 @@ export const manifest: MigrationManifest = {
       description:
         "Connection pointer on the inbound-delivery inbox (nullable connection_id + partial index) — lets the per-connection delivery log scope precisely; attributed by the IG2 cron drain",
     },
+    {
+      id: "200_expiry_core",
+      context: "expiry",
+      path: "200_expiry_core/up.sql",
+      checksum:
+        "4837606f7504e947be86c6b500ee7483ff97143c0f1488f81800c6cc41f06bfc",
+      description:
+        "Expiry persistence foundation (EX1) — tracked items (licences, permits, policies, certifications) scoped to an organization and optionally to a project-as-location, plus the materialised 90/60/30/7/0 reminder ladder whose UNIQUE (item_id, offset_days) index is what makes a duplicate chase impossible",
+    },
   ],
 };

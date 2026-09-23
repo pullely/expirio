@@ -11,6 +11,7 @@
     "./identity": "./src/identity/index.ts",
     "./membership": "./src/membership/index.ts",
     "./events": "./src/events/index.ts",
+    "./expiry": "./src/expiry/index.ts",
     "./projects": "./src/projects/index.ts",
     "./config": "./src/config/index.ts",
     "./webhooks": "./src/webhooks/index.ts",
