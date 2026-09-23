@@ -169,10 +169,59 @@ const renderInvitationAccepted: TemplateRenderer = (data, opts) => {
   return { subject, html, text };
 };
 
+/**
+ * Expirio's escalation ladder (EX2): one renderer per tier. The holder is told
+ * their own credential is due; the manager and owner are told whose, and how
+ * late in the ladder it has got. `templateData` never carries a licence
+ * number — `itemName`, `expiresOn` and the day count are all an email needs.
+ */
+function daysPhrase(days: number): string {
+  if (days < 0) return `expired ${Math.abs(days)} day${Math.abs(days) === 1 ? "" : "s"} ago`;
+  if (days === 0) return "expires today";
+  return `expires in ${days} day${days === 1 ? "" : "s"}`;
+}
+
+function expiryReminderRenderer(tier: "holder" | "manager" | "owner"): TemplateRenderer {
+  return (data, opts) => {
+    const item = str(data, "itemName") || "A tracked credential";
+    const expiresOn = str(data, "expiresOn");
+    const days = Number(data.daysRemaining ?? 0);
+    const brand = opts.brandName ?? "";
+    const phrase = daysPhrase(Number.isFinite(days) ? days : 0);
+    const subject =
+      tier === "holder"
+        ? `${item} ${phrase}`
+        : tier === "manager"
+          ? `Action needed: ${item} ${phrase}`
+          : `Escalation: ${item} ${phrase}`;
+    const lead =
+      tier === "holder"
+        ? `Your ${item} ${phrase}${expiresOn ? ` (${expiresOn})` : ""}. Renew it and record the new date so the reminders stop.`
+        : tier === "manager"
+          ? `${item} ${phrase}${expiresOn ? ` (${expiresOn})` : ""} and has not been renewed yet. Earlier reminders went to the holder.`
+          : `${item} ${phrase}${expiresOn ? ` (${expiresOn})` : ""}. The holder and their manager have already been reminded; this is the last rung of the ladder.`;
+    const tail = "Once it is renewed, record the new expiry date and the remaining reminders are cancelled.";
+
+    const text = [lead, "", tail].join("\n");
+    const html = htmlShell(
+      tier === "holder" ? "Renewal due" : tier === "manager" ? "Renewal overdue for attention" : "Renewal escalated",
+      [
+        `<p style="margin:0 0 16px;font-size:14px;">${escapeHtml(lead)}</p>`,
+        `<p style="margin:0;font-size:13px;color:#6b6b80;">${escapeHtml(tail)}</p>`,
+      ].join(""),
+      escapeHtml(brand ? `Sent by ${brand}` : "This is an automated reminder."),
+    );
+    return { subject: brand ? `[${brand}] ${subject}` : subject, html, text };
+  };
+}
+
 const TEMPLATES: Record<string, TemplateRenderer> = {
   "auth.magic_link": renderMagicLink,
   "invitation.created": renderInvitationCreated,
   "invitation.accepted": renderInvitationAccepted,
+  "expiry.reminder.holder": expiryReminderRenderer("holder"),
+  "expiry.reminder.manager": expiryReminderRenderer("manager"),
+  "expiry.reminder.owner": expiryReminderRenderer("owner"),
 };
 
 /**

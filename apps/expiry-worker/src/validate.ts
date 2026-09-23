@@ -155,3 +155,42 @@ export function validateItemBody(
   if (Object.keys(fields).length > 0) return { valid: false, fields };
   return { valid: true, value: out };
 }
+
+export interface ApplyTemplateFields {
+  projectPublicId: string | null;
+  holderName: string | null;
+  holderEmail: string | null;
+  managerEmail: string | null;
+  issuedOn: string | null;
+  itemKeys: string[] | undefined;
+}
+
+/** `POST …/expiry-templates/{key}/apply` — every field optional. */
+export function validateApplyTemplateBody(body: unknown): ValidationOutcome<ApplyTemplateFields> {
+  const req = (body ?? {}) as Record<string, unknown>;
+  if (typeof req !== "object" || Array.isArray(req)) {
+    return { valid: false, fields: { body: ["Request body must be an object"] } };
+  }
+  const fields: Record<string, string[]> = {};
+  const out: ApplyTemplateFields = {
+    projectPublicId: optionalText(req.projectId, "projectId", 64, fields) ?? null,
+    holderName: optionalText(req.holderName, "holderName", TEXT_MAX, fields) ?? null,
+    holderEmail: optionalEmail(req.holderEmail, "holderEmail", fields) ?? null,
+    managerEmail: optionalEmail(req.managerEmail, "managerEmail", fields) ?? null,
+    issuedOn: optionalDate(req.issuedOn, "issuedOn", fields) ?? null,
+    itemKeys: undefined,
+  };
+  if (req.itemKeys !== undefined && req.itemKeys !== null) {
+    if (
+      !Array.isArray(req.itemKeys) ||
+      req.itemKeys.length > 20 ||
+      !req.itemKeys.every((k) => typeof k === "string" && k.length > 0 && k.length <= 64)
+    ) {
+      fields.itemKeys = ["Must be an array of at most 20 template item keys"];
+    } else {
+      out.itemKeys = req.itemKeys as string[];
+    }
+  }
+  if (Object.keys(fields).length > 0) return { valid: false, fields };
+  return { valid: true, value: out };
+}

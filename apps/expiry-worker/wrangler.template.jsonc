@@ -11,6 +11,10 @@
   "vars": {
     "ENVIRONMENT": "local"
   },
+  // EX2: the reminder sweep. Hourly at :25, off the :05 metering rollup.
+  "triggers": {
+    "crons": ["25 * * * *"]
+  },
   "env": {
     "dev": {
       "vars": {
@@ -41,6 +45,10 @@
         {
           "binding": "BILLING_WORKER",
           "service": "expirio-billing-worker-stage"
+        },
+        {
+          "binding": "NOTIFICATIONS_WORKER",
+          "service": "expirio-notifications-worker-stage"
         }
       ]
     },
@@ -68,6 +76,10 @@
         {
           "binding": "BILLING_WORKER",
           "service": "expirio-billing-worker-prod"
+        },
+        {
+          "binding": "NOTIFICATIONS_WORKER",
+          "service": "expirio-notifications-worker-prod"
         }
       ]
     }

@@ -9,6 +9,7 @@ import { createProjectsRepository } from "@saas/db/projects";
 import { createMeteringRepository } from "@saas/db/metering";
 import { createWebhookRepository } from "@saas/db/webhooks";
 import { createEventsRepository } from "@saas/db/events";
+import { createExpiryRepository } from "@saas/db/expiry";
 import { asUuid } from "@saas/db";
 import { D1ApiAdapter } from "@saas/db/runner";
 
@@ -473,5 +474,108 @@ describe("the rewritten queries, against a real SQLite engine", () => {
     const streak = await repo.countConsecutiveEndpointFailures(orgId, "wep_none");
     expect(streak.ok).toBe(true);
     if (streak.ok) expect(streak.value).toBe(0);
+  });
+});
+
+describe("the expiry sweep's queries, against a real SQLite engine (EX2)", () => {
+  let db: DatabaseSync;
+  let executor: ReturnType<typeof createSqlExecutor>;
+  const orgId = asUuid("12121212-1212-4212-8212-121212121212");
+  const itemId = "34343434-3434-4434-8434-343434343434";
+  const at = new Date("2026-10-01T10:25:00.000Z");
+
+  beforeEach(async () => {
+    db = migratedDatabase();
+    executor = createSqlExecutor(d1Over(db));
+    const repo = createExpiryRepository(executor);
+    const item = await repo.createItem({
+      id: itemId,
+      orgId,
+      projectId: null,
+      name: "DEA registration",
+      kind: "registration",
+      templateKey: "clinic/dea-registration",
+      issuer: null,
+      identifier: "BX1234563",
+      holderName: "Dr. Ng",
+      holderEmail: "ng@clinic.test",
+      managerEmail: null,
+      issuedOn: "2025-10-31",
+      expiresOn: "2026-10-31",
+      notes: null,
+      createdBy: null,
+      createdAt: at,
+    });
+    expect(item.ok).toBe(true);
+    const ladder = await repo.createReminders(
+      [
+        { offsetDays: 90, tier: "holder", scheduledFor: "2026-08-02" },
+        { offsetDays: 60, tier: "holder", scheduledFor: "2026-09-01" },
+        { offsetDays: 30, tier: "manager", scheduledFor: "2026-10-01" },
+        { offsetDays: 7, tier: "owner", scheduledFor: "2026-10-24" },
+      ].map((r, i) => ({
+        id: `56565656-5656-4656-8656-56565656565${i}`,
+        orgId,
+        itemId,
+        createdAt: at,
+        ...r,
+      })),
+    );
+    expect(ladder.ok && ladder.value).toBe(4);
+  });
+
+  afterEach(() => {
+    db.close();
+  });
+
+  it("selects the due rungs with their item, and sends one exactly once", async () => {
+    const repo = createExpiryRepository(executor);
+    const due = await repo.listDueReminders("2026-10-01", 50);
+    expect(due.ok).toBe(true);
+    if (!due.ok) return;
+    expect(due.value.map((r) => r.offsetDays)).toEqual([90, 60, 30]);
+    expect(due.value[2]!.itemExpiresOn).toBe("2026-10-31");
+    expect(due.value[2]!.holderEmail).toBe("ng@clinic.test");
+
+    const first = await repo.markReminderSent(due.value[2]!.id, "owner@clinic.test", "ntf_1", at);
+    const second = await repo.markReminderSent(due.value[2]!.id, "owner@clinic.test", "ntf_2", at);
+    expect(first.ok && first.value).toBe(true);
+    expect(second.ok && second.value).toBe(false);
+    const row = db
+      .prepare("SELECT status, notification_id FROM expiry_reminders WHERE id = ?")
+      .get(due.value[2]!.id) as { status: string; notification_id: string };
+    expect(row).toEqual({ status: "sent", notification_id: "ntf_1" });
+
+    expect((await repo.markReminderFailed(due.value[0]!.id, at)).ok).toBe(true);
+    const after = await repo.listDueReminders("2026-10-01", 50);
+    expect(after.ok && after.value.map((r) => r.offsetDays)).toEqual([60]);
+  });
+
+  it("reads the org's active owners through membership and identity", async () => {
+    const userId = "78787878-7878-4878-8878-787878787878";
+    db.prepare(
+      "INSERT INTO identity_users (id, email, email_lower) VALUES (?, 'Owner@Clinic.test', 'owner@clinic.test')",
+    ).run(userId);
+    db.prepare(
+      "INSERT INTO membership_organization_members (id, org_id, subject_id) VALUES ('m1', ?, ?)",
+    ).run(orgId, userId);
+    db.prepare(
+      "INSERT INTO membership_role_assignments (id, org_id, subject_id, role) VALUES ('ra1', ?, ?, 'owner')",
+    ).run(orgId, userId);
+    const repo = createExpiryRepository(executor);
+    const owners = await repo.listOwnerEmails(orgId);
+    expect(owners).toEqual({ ok: true, value: ["owner@clinic.test"] });
+  });
+
+  it("builds the scorecard and ages the overdue", async () => {
+    const repo = createExpiryRepository(executor);
+    const card = await repo.scorecard(orgId, "2026-10-01", "2026-10-31");
+    expect(card.ok && card.value).toEqual([
+      { projectId: null, total: 1, active: 1, expiring: 0, expired: 0, renewed: 0, dueWithin30: 1 },
+    ]);
+    const overdue = await repo.listOverdueItems("2026-11-01", 10);
+    expect(overdue.ok && overdue.value.map((i) => i.id)).toEqual([itemId]);
+    const aged = await repo.setItemStatus(orgId, itemId, "expired", at);
+    expect(aged.ok && aged.value).toBe(true);
   });
 });

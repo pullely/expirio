@@ -1,4 +1,8 @@
 import type {
+  ApplyExpiryTemplateRequest,
+  ApplyExpiryTemplateResponse,
+  GetExpiryScorecardResponse,
+  ListExpiryTemplatesResponse,
   ArchiveExpiryItemResponse,
   CreateExpiryItemRequest,
   CreateExpiryItemResponse,
@@ -153,6 +157,50 @@ export class ExpiryClient {
       {
         method: "GET",
         path: `/v1/organizations/${encodeURIComponent(orgId)}/expiry-items/${encodeURIComponent(itemId)}/reminders`,
+      },
+      opts,
+    );
+  }
+
+  /** GET /v1/organizations/:orgId/expiry-templates — the vertical catalogue. */
+  templates(orgId: string, opts: RequestOptions = {}): Promise<ListExpiryTemplatesResponse> {
+    return this.transport.request<ListExpiryTemplatesResponse>(
+      {
+        method: "GET",
+        path: `/v1/organizations/${encodeURIComponent(orgId)}/expiry-templates`,
+      },
+      opts,
+    );
+  }
+
+  /**
+   * POST /v1/organizations/:orgId/expiry-templates/:key/apply
+   *
+   * Fans one vertical out into its tracked items (each with its ladder) in one
+   * call. Pass `idempotencyKey` in `opts` so a retried click does not double it.
+   */
+  applyTemplate(
+    orgId: string,
+    templateKey: string,
+    body: ApplyExpiryTemplateRequest = {},
+    opts: RequestOptions = {},
+  ): Promise<ApplyExpiryTemplateResponse> {
+    return this.transport.request<ApplyExpiryTemplateResponse>(
+      {
+        method: "POST",
+        path: `/v1/organizations/${encodeURIComponent(orgId)}/expiry-templates/${encodeURIComponent(templateKey)}/apply`,
+        body,
+      },
+      opts,
+    );
+  }
+
+  /** GET /v1/organizations/:orgId/expiry-scorecard — compliance per location. */
+  scorecard(orgId: string, opts: RequestOptions = {}): Promise<GetExpiryScorecardResponse> {
+    return this.transport.request<GetExpiryScorecardResponse>(
+      {
+        method: "GET",
+        path: `/v1/organizations/${encodeURIComponent(orgId)}/expiry-scorecard`,
       },
       opts,
     );
