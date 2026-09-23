@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { DaysBadge, StatusBadge, locationLabel, useLocationNames } from "@/components/expiry/expiry-ui";
 import { RenewDialog } from "@/components/expiry/renew-dialog";
+import { DocumentsPanel, RenewalLinkButton } from "@/components/expiry/item-edges";
 import { useSession } from "@/lib/session";
 import { useApiQuery, qk } from "@/lib/query";
 import { wrap } from "@/lib/api";
@@ -138,6 +139,11 @@ function Item({ orgId, orgSlug, itemId }: { orgId: string; orgSlug: string; item
           )}
         </CardContent>
       </Card>
+
+      <div className="grid gap-5 md:grid-cols-2">
+        <DocumentsPanel orgId={orgId} itemId={it.id} />
+        {it.status !== "archived" && <RenewalLinkButton orgId={orgId} itemId={it.id} />}
+      </div>
 
       <RenewDialog
         orgId={orgId}
