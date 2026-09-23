@@ -8,6 +8,9 @@ const ORG_ITEMS_RE = /^\/v1\/organizations\/[^/]+\/expiry-items$/;
 const ORG_ITEM_ID_RE = /^\/v1\/organizations\/[^/]+\/expiry-items\/[^/]+$/;
 const ORG_ITEM_RENEW_RE = /^\/v1\/organizations\/[^/]+\/expiry-items\/[^/]+\/renew$/;
 const ORG_ITEM_REMINDERS_RE = /^\/v1\/organizations\/[^/]+\/expiry-items\/[^/]+\/reminders$/;
+const ORG_TEMPLATES_RE = /^\/v1\/organizations\/[^/]+\/expiry-templates$/;
+const ORG_TEMPLATE_APPLY_RE = /^\/v1\/organizations\/[^/]+\/expiry-templates\/[^/]+\/apply$/;
+const ORG_SCORECARD_RE = /^\/v1\/organizations\/[^/]+\/expiry-scorecard$/;
 
 const FORWARDED_HEADERS = ["content-type", "x-request-id", "traceparent", "idempotency-key"];
 
@@ -18,7 +21,10 @@ export function isExpiryRoute(pathname: string): boolean {
     ORG_ITEMS_RE.test(pathname) ||
     ORG_ITEM_RENEW_RE.test(pathname) ||
     ORG_ITEM_REMINDERS_RE.test(pathname) ||
-    ORG_ITEM_ID_RE.test(pathname)
+    ORG_ITEM_ID_RE.test(pathname) ||
+    ORG_TEMPLATES_RE.test(pathname) ||
+    ORG_TEMPLATE_APPLY_RE.test(pathname) ||
+    ORG_SCORECARD_RE.test(pathname)
   );
 }
 
@@ -28,6 +34,9 @@ function methodAllowed(pathname: string, method: string): boolean {
   if (ORG_ITEMS_RE.test(pathname)) return method === "POST" || method === "GET";
   if (ORG_ITEM_RENEW_RE.test(pathname)) return method === "POST";
   if (ORG_ITEM_REMINDERS_RE.test(pathname)) return method === "GET";
+  if (ORG_TEMPLATES_RE.test(pathname)) return method === "GET";
+  if (ORG_TEMPLATE_APPLY_RE.test(pathname)) return method === "POST";
+  if (ORG_SCORECARD_RE.test(pathname)) return method === "GET";
   if (ORG_ITEM_ID_RE.test(pathname)) {
     return method === "GET" || method === "PATCH" || method === "DELETE";
   }

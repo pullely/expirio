@@ -161,3 +161,72 @@ export interface ListExpiryItemsResponse {
 export interface ListExpiryRemindersResponse {
   reminders: PublicExpiryReminder[];
 }
+
+// ---------------------------------------------------------------------------
+// EX2 — vertical templates and the compliance scorecard
+// ---------------------------------------------------------------------------
+
+export const EXPIRY_TEMPLATE_VERTICALS = ["clinic", "trades", "childcare"] as const;
+
+export type ExpiryTemplateVertical = (typeof EXPIRY_TEMPLATE_VERTICALS)[number];
+
+/** One credential a vertical tracks, with a hint for its issuer and a default validity. */
+export interface PublicExpiryTemplateItem {
+  key: string;
+  name: string;
+  kind: ExpiryItemKind;
+  issuer: string | null;
+  /** Default validity from the issue date, in months. The operator corrects the real date. */
+  validityMonths: number;
+}
+
+export interface PublicExpiryTemplate {
+  key: ExpiryTemplateVertical;
+  name: string;
+  description: string;
+  items: PublicExpiryTemplateItem[];
+}
+
+export interface ListExpiryTemplatesResponse {
+  templates: PublicExpiryTemplate[];
+}
+
+/**
+ * Apply a vertical: one item per template row (or the subset named in
+ * `itemKeys`), each expiring `validityMonths` after `issuedOn` (today when
+ * omitted), for one holder at one location.
+ */
+export interface ApplyExpiryTemplateRequest {
+  projectId?: string | null;
+  holderName?: string | null;
+  holderEmail?: string | null;
+  managerEmail?: string | null;
+  issuedOn?: string | null;
+  itemKeys?: string[];
+}
+
+export interface ApplyExpiryTemplateResponse {
+  template: ExpiryTemplateVertical;
+  items: PublicExpiryItem[];
+}
+
+/** Compliance per location. `projectId` null is the organization-wide bucket. */
+export interface PublicExpiryScorecardRow {
+  projectId: string | null;
+  total: number;
+  active: number;
+  expiring: number;
+  expired: number;
+  renewed: number;
+  /** Items (not archived) whose date falls inside the next 30 days. */
+  dueWithin30: number;
+  /** Share of tracked items that are currently valid (not expired), 0–100. */
+  compliantPercent: number;
+}
+
+export interface GetExpiryScorecardResponse {
+  asOf: string;
+  horizonDays: number;
+  totals: Omit<PublicExpiryScorecardRow, "projectId">;
+  locations: PublicExpiryScorecardRow[];
+}

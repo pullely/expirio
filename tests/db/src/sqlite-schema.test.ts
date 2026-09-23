@@ -8,6 +8,8 @@ import { createMembershipRepository } from "@saas/db/membership";
 import { createProjectsRepository } from "@saas/db/projects";
 import { createMeteringRepository } from "@saas/db/metering";
 import { createWebhookRepository } from "@saas/db/webhooks";
+import { createEventsRepository } from "@saas/db/events";
+import { createExpiryRepository } from "@saas/db/expiry";
 import { asUuid } from "@saas/db";
 import { D1ApiAdapter } from "@saas/db/runner";
 
@@ -322,6 +324,147 @@ describe("the rewritten queries, against a real SQLite engine", () => {
     expect(new Date(row.previous_secret_expires_at).getTime()).toBeGreaterThan(Date.now());
   });
 
+  it("bootstraps an organization and accepts an invitation into it — the firm's two front doors", async () => {
+    // chaseid CH3: both were single Postgres data-modifying CTEs with
+    // row_to_json, which SQLite cannot parse — no org could be created on D1.
+    const repo = createMembershipRepository(executor);
+    const orgId = asUuid("77777777-7777-4777-8777-777777777777");
+    const now = new Date("2026-09-23T09:00:00.000Z");
+    const boot = await repo.bootstrapOrganization({
+      org: { id: orgId, name: "Harbourside Practice", slug: "harbourside", slugLower: "harbourside", createdAt: now },
+      member: { id: "11111111-aaaa-4aaa-8aaa-111111111111", orgId, subjectId: "usr_owner", subjectType: "user", createdAt: now },
+      roleAssignment: {
+        id: "22222222-aaaa-4aaa-8aaa-222222222222",
+        orgId,
+        subjectId: "usr_owner",
+        subjectType: "user",
+        role: "owner",
+        scopeKind: "organization",
+        createdAt: now,
+      },
+    });
+    expect(boot.ok).toBe(true);
+    if (boot.ok) {
+      expect(boot.value.org.slug).toBe("harbourside");
+      expect(boot.value.roleAssignment.role).toBe("owner");
+    }
+
+    // Same slug again: a conflict, and nothing half-written left behind.
+    const again = await repo.bootstrapOrganization({
+      org: { id: asUuid("77777777-7777-4777-8777-777777777778"), name: "Dup", slug: "harbourside", slugLower: "harbourside", createdAt: now },
+      member: { id: "11111111-aaaa-4aaa-8aaa-111111111112", orgId: asUuid("77777777-7777-4777-8777-777777777778"), subjectId: "usr_x", subjectType: "user", createdAt: now },
+      roleAssignment: {
+        id: "22222222-aaaa-4aaa-8aaa-222222222223",
+        orgId: asUuid("77777777-7777-4777-8777-777777777778"),
+        subjectId: "usr_x",
+        subjectType: "user",
+        role: "owner",
+        scopeKind: "organization",
+        createdAt: now,
+      },
+    });
+    expect(again.ok).toBe(false);
+    const orgs = db.prepare("SELECT count(*) AS n FROM membership_organizations").get() as { n: number };
+    expect(Number(orgs.n)).toBe(1);
+
+    const invited = await repo.createInvitation({
+      id: "33333333-aaaa-4aaa-8aaa-333333333333",
+      orgId,
+      email: "Reviewer@Example.com",
+      emailLower: "reviewer@example.com",
+      role: "viewer",
+      tokenHash: "hash-1",
+      invitedBy: "usr_owner",
+      expiresAt: new Date("2026-10-23T09:00:00.000Z"),
+      createdAt: now,
+    });
+    expect(invited.ok).toBe(true);
+
+    const accepted = await repo.acceptInvitation({
+      tokenHash: "hash-1",
+      orgId,
+      emailLower: "reviewer@example.com",
+      memberId: "44444444-aaaa-4aaa-8aaa-444444444444",
+      roleAssignmentId: "55555555-aaaa-4aaa-8aaa-555555555555",
+      subjectId: "usr_reviewer",
+      subjectType: "user",
+      acceptedAt: now,
+    });
+    expect(accepted.ok).toBe(true);
+    if (accepted.ok) {
+      expect(accepted.value.invitation.status).toBe("accepted");
+      expect(accepted.value.roleAssignment.role).toBe("viewer");
+      expect(accepted.value.member.orgId).toBe(orgId);
+    }
+
+    // A second accept of the same token finds nothing pending.
+    const replay = await repo.acceptInvitation({
+      tokenHash: "hash-1",
+      orgId,
+      emailLower: "reviewer@example.com",
+      memberId: "44444444-aaaa-4aaa-8aaa-444444444445",
+      roleAssignmentId: "55555555-aaaa-4aaa-8aaa-555555555556",
+      subjectId: "usr_reviewer",
+      subjectType: "user",
+      acceptedAt: now,
+    });
+    expect(replay.ok).toBe(false);
+  });
+
+  it("appends an event WITH its audit entry — the path every audited write takes", async () => {
+    // chaseid CH2: this was a Postgres data-modifying CTE with row_to_json,
+    // which SQLite cannot parse, so every audited write on D1 failed.
+    const repo = createEventsRepository(executor);
+    const orgId = "99999999-9999-4999-8999-999999999999";
+    const appended = await repo.appendEventWithAudit({
+      event: {
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        type: "chase.director.chased",
+        version: 1,
+        source: "chase-worker",
+        occurredAt: new Date("2026-09-23T09:00:00.000Z"),
+        actorType: "system",
+        actorId: "chase-worker",
+        orgId,
+        subjectKind: "director",
+        subjectId: "prs_1",
+        subjectName: "Jane Director",
+        requestId: "req_1",
+        payload: { step: 1 },
+      },
+      audit: { id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", category: "chase", description: "Sent chase step 1" },
+    });
+    expect(appended.ok).toBe(true);
+    if (appended.ok) {
+      expect(appended.value.audit.eventId).toBe("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+      expect(appended.value.audit.category).toBe("chase");
+    }
+
+    const page = await repo.queryAuditByOrg(orgId, { limit: 10, cursor: null }, "chase");
+    expect(page.ok).toBe(true);
+    if (page.ok) expect(page.value.items.map((a) => a.eventType)).toEqual(["chase.director.chased"]);
+
+    // A replay of the same event id is a conflict, not a second row.
+    const again = await repo.appendEventWithAudit({
+      event: {
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        type: "chase.director.chased",
+        version: 1,
+        source: "chase-worker",
+        occurredAt: new Date("2026-09-23T09:00:00.000Z"),
+        actorType: "system",
+        actorId: "chase-worker",
+        orgId,
+        subjectKind: "director",
+        subjectId: "prs_1",
+        requestId: "req_1",
+        payload: {},
+      },
+      audit: { id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc" },
+    });
+    expect(again.ok).toBe(false);
+  });
+
   it("counts a delivery failure streak past the epoch fallback", async () => {
     // The fallback used a `'1970-01-01'::timestamptz` cast; with no prior
     // success the whole count depends on it comparing sanely against the
@@ -331,5 +474,108 @@ describe("the rewritten queries, against a real SQLite engine", () => {
     const streak = await repo.countConsecutiveEndpointFailures(orgId, "wep_none");
     expect(streak.ok).toBe(true);
     if (streak.ok) expect(streak.value).toBe(0);
+  });
+});
+
+describe("the expiry sweep's queries, against a real SQLite engine (EX2)", () => {
+  let db: DatabaseSync;
+  let executor: ReturnType<typeof createSqlExecutor>;
+  const orgId = asUuid("12121212-1212-4212-8212-121212121212");
+  const itemId = "34343434-3434-4434-8434-343434343434";
+  const at = new Date("2026-10-01T10:25:00.000Z");
+
+  beforeEach(async () => {
+    db = migratedDatabase();
+    executor = createSqlExecutor(d1Over(db));
+    const repo = createExpiryRepository(executor);
+    const item = await repo.createItem({
+      id: itemId,
+      orgId,
+      projectId: null,
+      name: "DEA registration",
+      kind: "registration",
+      templateKey: "clinic/dea-registration",
+      issuer: null,
+      identifier: "BX1234563",
+      holderName: "Dr. Ng",
+      holderEmail: "ng@clinic.test",
+      managerEmail: null,
+      issuedOn: "2025-10-31",
+      expiresOn: "2026-10-31",
+      notes: null,
+      createdBy: null,
+      createdAt: at,
+    });
+    expect(item.ok).toBe(true);
+    const ladder = await repo.createReminders(
+      [
+        { offsetDays: 90, tier: "holder", scheduledFor: "2026-08-02" },
+        { offsetDays: 60, tier: "holder", scheduledFor: "2026-09-01" },
+        { offsetDays: 30, tier: "manager", scheduledFor: "2026-10-01" },
+        { offsetDays: 7, tier: "owner", scheduledFor: "2026-10-24" },
+      ].map((r, i) => ({
+        id: `56565656-5656-4656-8656-56565656565${i}`,
+        orgId,
+        itemId,
+        createdAt: at,
+        ...r,
+      })),
+    );
+    expect(ladder.ok && ladder.value).toBe(4);
+  });
+
+  afterEach(() => {
+    db.close();
+  });
+
+  it("selects the due rungs with their item, and sends one exactly once", async () => {
+    const repo = createExpiryRepository(executor);
+    const due = await repo.listDueReminders("2026-10-01", 50);
+    expect(due.ok).toBe(true);
+    if (!due.ok) return;
+    expect(due.value.map((r) => r.offsetDays)).toEqual([90, 60, 30]);
+    expect(due.value[2]!.itemExpiresOn).toBe("2026-10-31");
+    expect(due.value[2]!.holderEmail).toBe("ng@clinic.test");
+
+    const first = await repo.markReminderSent(due.value[2]!.id, "owner@clinic.test", "ntf_1", at);
+    const second = await repo.markReminderSent(due.value[2]!.id, "owner@clinic.test", "ntf_2", at);
+    expect(first.ok && first.value).toBe(true);
+    expect(second.ok && second.value).toBe(false);
+    const row = db
+      .prepare("SELECT status, notification_id FROM expiry_reminders WHERE id = ?")
+      .get(due.value[2]!.id) as { status: string; notification_id: string };
+    expect(row).toEqual({ status: "sent", notification_id: "ntf_1" });
+
+    expect((await repo.markReminderFailed(due.value[0]!.id, at)).ok).toBe(true);
+    const after = await repo.listDueReminders("2026-10-01", 50);
+    expect(after.ok && after.value.map((r) => r.offsetDays)).toEqual([60]);
+  });
+
+  it("reads the org's active owners through membership and identity", async () => {
+    const userId = "78787878-7878-4878-8878-787878787878";
+    db.prepare(
+      "INSERT INTO identity_users (id, email, email_lower) VALUES (?, 'Owner@Clinic.test', 'owner@clinic.test')",
+    ).run(userId);
+    db.prepare(
+      "INSERT INTO membership_organization_members (id, org_id, subject_id) VALUES ('m1', ?, ?)",
+    ).run(orgId, userId);
+    db.prepare(
+      "INSERT INTO membership_role_assignments (id, org_id, subject_id, role) VALUES ('ra1', ?, ?, 'owner')",
+    ).run(orgId, userId);
+    const repo = createExpiryRepository(executor);
+    const owners = await repo.listOwnerEmails(orgId);
+    expect(owners).toEqual({ ok: true, value: ["owner@clinic.test"] });
+  });
+
+  it("builds the scorecard and ages the overdue", async () => {
+    const repo = createExpiryRepository(executor);
+    const card = await repo.scorecard(orgId, "2026-10-01", "2026-10-31");
+    expect(card.ok && card.value).toEqual([
+      { projectId: null, total: 1, active: 1, expiring: 0, expired: 0, renewed: 0, dueWithin30: 1 },
+    ]);
+    const overdue = await repo.listOverdueItems("2026-11-01", 10);
+    expect(overdue.ok && overdue.value.map((i) => i.id)).toEqual([itemId]);
+    const aged = await repo.setItemStatus(orgId, itemId, "expired", at);
+    expect(aged.ok && aged.value).toBe(true);
   });
 });

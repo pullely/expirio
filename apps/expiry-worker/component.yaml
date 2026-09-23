@@ -10,6 +10,9 @@ spec:
   domain: starter-runtime
   path: apps/expiry-worker
   dependsOn:
+    # Runbook trap 21: the migration deploys before code that reads its tables.
+    - component: db-migrate
+    - component: notifications-worker
     - component: membership-worker
     - component: policy-worker
     - component: billing-worker
@@ -67,3 +70,4 @@ spec:
     layer: runtime
     surface: expiry
     runtime: cloudflare
+# redeploy: EX-3 carries the cirrus D1 fix (appendEventWithAudit + membership writes, no Postgres-only SQL)

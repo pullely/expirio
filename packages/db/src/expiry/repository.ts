@@ -273,7 +273,8 @@ export function createExpiryRepository(executor: SqlExecutor): ExpiryRepository 
             `INSERT INTO expiry_reminders
                (id, org_id, item_id, offset_days, tier, scheduled_for, status, created_at, updated_at)
              VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7, $7)
-             ON CONFLICT (item_id, offset_days) DO NOTHING`,
+             ON CONFLICT (item_id, offset_days) DO NOTHING
+             RETURNING id`,
             [
               input.id,
               input.orgId,
@@ -310,7 +311,8 @@ export function createExpiryRepository(executor: SqlExecutor): ExpiryRepository 
       try {
         const result = await executor.execute<Record<string, unknown>>(
           `DELETE FROM expiry_reminders
-           WHERE org_id = $1 AND item_id = $2 AND status = 'pending'`,
+           WHERE org_id = $1 AND item_id = $2 AND status = 'pending'
+           RETURNING id`,
           [orgId, itemId],
         );
         return { ok: true, value: result.rowCount ?? 0 };
@@ -324,7 +326,8 @@ export function createExpiryRepository(executor: SqlExecutor): ExpiryRepository 
         const result = await executor.execute<Record<string, unknown>>(
           `UPDATE expiry_reminders
            SET status = 'skipped', updated_at = $3
-           WHERE org_id = $1 AND item_id = $2 AND status = 'pending'`,
+           WHERE org_id = $1 AND item_id = $2 AND status = 'pending'
+           RETURNING id`,
           [orgId, itemId, at.toISOString()],
         );
         return { ok: true, value: result.rowCount ?? 0 };
@@ -374,7 +377,8 @@ export function createExpiryRepository(executor: SqlExecutor): ExpiryRepository 
         const result = await executor.execute<Record<string, unknown>>(
           `UPDATE expiry_reminders
            SET status = 'sent', recipient = $2, notification_id = $3, sent_at = $4, updated_at = $4
-           WHERE id = $1 AND status = 'pending'`,
+           WHERE id = $1 AND status = 'pending'
+           RETURNING id`,
           [id, recipient, notificationId, sentAt.toISOString()],
         );
         return { ok: true, value: (result.rowCount ?? 0) > 0 };
@@ -388,12 +392,51 @@ export function createExpiryRepository(executor: SqlExecutor): ExpiryRepository 
         const result = await executor.execute<Record<string, unknown>>(
           `UPDATE expiry_reminders
            SET status = 'skipped', updated_at = $2
-           WHERE id = $1 AND status = 'pending'`,
+           WHERE id = $1 AND status = 'pending'
+           RETURNING id`,
           [id, at.toISOString()],
         );
         return { ok: true, value: (result.rowCount ?? 0) > 0 };
       } catch {
         return safeError("Failed to skip the reminder");
+      }
+    },
+
+    async markReminderFailed(id: string, at: Date): Promise<ExpiryResult<boolean>> {
+      try {
+        const result = await executor.execute<Record<string, unknown>>(
+          `UPDATE expiry_reminders
+           SET status = 'failed', updated_at = $2
+           WHERE id = $1 AND status = 'pending'
+           RETURNING id`,
+          [id, at.toISOString()],
+        );
+        return { ok: true, value: (result.rowCount ?? 0) > 0 };
+      } catch {
+        return safeError("Failed to fail the reminder");
+      }
+    },
+
+    async listOwnerEmails(orgId: string): Promise<ExpiryResult<string[]>> {
+      try {
+        const result = await executor.execute<Record<string, unknown>>(
+          `SELECT u.email_lower AS email
+           FROM membership_role_assignments ra
+           JOIN membership_organization_members m
+             ON m.org_id = ra.org_id AND m.subject_id = ra.subject_id AND m.status = 'active'
+           JOIN identity_users u ON u.id = ra.subject_id AND u.status = 'active'
+           WHERE ra.org_id = $1 AND ra.role = 'owner' AND ra.scope_kind = 'organization'
+             AND ra.revoked_at IS NULL
+           ORDER BY ra.created_at ASC, ra.id ASC
+           LIMIT 5`,
+          [orgId],
+        );
+        const emails = result.rows
+          .map((row) => str(row.email))
+          .filter((e): e is string => typeof e === "string" && e.length > 0);
+        return { ok: true, value: [...new Set(emails)] };
+      } catch {
+        return safeError("Failed to read the organization owners");
       }
     },
 
@@ -421,7 +464,8 @@ export function createExpiryRepository(executor: SqlExecutor): ExpiryRepository 
       try {
         const result = await executor.execute<Record<string, unknown>>(
           `UPDATE expiry_items SET status = $3, updated_at = $4
-           WHERE org_id = $1 AND id = $2 AND status <> $3`,
+           WHERE org_id = $1 AND id = $2 AND status <> $3
+           RETURNING id`,
           [orgId, itemId, status, at.toISOString()],
         );
         return { ok: true, value: (result.rowCount ?? 0) > 0 };

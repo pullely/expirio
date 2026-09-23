@@ -22,7 +22,7 @@ one-off upload link to renew a card without an account, a password or a seat.
 
 | Field | Value |
 |-------|-------|
-| Status | Draft |
+| Status | In progress |
 | Cluster | **EX** (EX0–EX3) |
 | Owner(s) | `apps/expiry-worker` (the resource, the clock) · `apps/api-edge` (the facade and the public ingress) · `packages/db` + `packages/contracts` + `packages/sdk` (persistence and the wire) · `apps/notifications-worker` (the reminder emails) · `apps/web-console-next` (the surface) |
 | Builds on | `cirrus baseline-v12` — extends identity, membership/RBAC, projects (as *locations*), events/audit, notifications, webhooks, metering and billing entitlements without forking any of them |

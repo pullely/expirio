@@ -7,6 +7,9 @@ import { handleUpdateItem } from "./handlers/update-item.js";
 import { handleArchiveItem } from "./handlers/archive-item.js";
 import { handleRenewItem } from "./handlers/renew-item.js";
 import { handleListReminders } from "./handlers/list-reminders.js";
+import { handleListTemplates } from "./handlers/list-templates.js";
+import { handleApplyTemplate } from "./handlers/apply-template.js";
+import { handleScorecard } from "./handlers/scorecard.js";
 import { errorResponse, methodNotAllowed, notFound } from "./http.js";
 import { generateRequestId, parseExpiryItemPublicId, parseOrgPublicId } from "./ids.js";
 
@@ -38,6 +41,9 @@ const ORG_ITEMS_RE = /^\/v1\/organizations\/([^/]+)\/expiry-items$/;
 const ORG_ITEM_ID_RE = /^\/v1\/organizations\/([^/]+)\/expiry-items\/([^/]+)$/;
 const ORG_ITEM_RENEW_RE = /^\/v1\/organizations\/([^/]+)\/expiry-items\/([^/]+)\/renew$/;
 const ORG_ITEM_REMINDERS_RE = /^\/v1\/organizations\/([^/]+)\/expiry-items\/([^/]+)\/reminders$/;
+const ORG_TEMPLATES_RE = /^\/v1\/organizations\/([^/]+)\/expiry-templates$/;
+const ORG_TEMPLATE_APPLY_RE = /^\/v1\/organizations\/([^/]+)\/expiry-templates\/([a-z0-9-]{1,32})\/apply$/;
+const ORG_SCORECARD_RE = /^\/v1\/organizations\/([^/]+)\/expiry-scorecard$/;
 
 export async function route(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
@@ -46,6 +52,36 @@ export async function route(request: Request, env: Env): Promise<Response> {
   try {
     if (url.pathname === "/health" && request.method === "GET") {
       return handleHealth(env, requestId);
+    }
+
+    const templatesMatch = url.pathname.match(ORG_TEMPLATES_RE);
+    if (templatesMatch) {
+      if (request.method !== "GET") return methodNotAllowed(requestId);
+      const orgUuid = parseOrgPublicId(templatesMatch[1]!);
+      if (!orgUuid) return errorResponse("not_found", "Not found", 404, requestId);
+      const actor = resolveActor(request);
+      if (!actor) return errorResponse("unauthenticated", "Authentication required", 401, requestId);
+      return handleListTemplates(env, requestId, actor, orgUuid);
+    }
+
+    const applyMatch = url.pathname.match(ORG_TEMPLATE_APPLY_RE);
+    if (applyMatch) {
+      if (request.method !== "POST") return methodNotAllowed(requestId);
+      const orgUuid = parseOrgPublicId(applyMatch[1]!);
+      if (!orgUuid) return errorResponse("not_found", "Not found", 404, requestId);
+      const actor = resolveActor(request);
+      if (!actor) return errorResponse("unauthenticated", "Authentication required", 401, requestId);
+      return handleApplyTemplate(request, env, requestId, actor, orgUuid, applyMatch[2]!);
+    }
+
+    const scorecardMatch = url.pathname.match(ORG_SCORECARD_RE);
+    if (scorecardMatch) {
+      if (request.method !== "GET") return methodNotAllowed(requestId);
+      const orgUuid = parseOrgPublicId(scorecardMatch[1]!);
+      if (!orgUuid) return errorResponse("not_found", "Not found", 404, requestId);
+      const actor = resolveActor(request);
+      if (!actor) return errorResponse("unauthenticated", "Authentication required", 401, requestId);
+      return handleScorecard(env, requestId, actor, orgUuid);
     }
 
     const renewMatch = url.pathname.match(ORG_ITEM_RENEW_RE);

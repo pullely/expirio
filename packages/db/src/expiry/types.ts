@@ -164,6 +164,14 @@ export interface ExpiryRepository {
     sentAt: Date,
   ): Promise<ExpiryResult<boolean>>;
   markReminderSkipped(id: string, at: Date): Promise<ExpiryResult<boolean>>;
+  /** A rung with nobody to send to: `failed`, with the reason in `recipient` left null. */
+  markReminderFailed(id: string, at: Date): Promise<ExpiryResult<boolean>>;
+  /**
+   * The org's active owners' email addresses, oldest assignment first — the
+   * top tier of the ladder. A read-only join onto membership and identity rows
+   * in the same D1 database; nothing is written across the context boundary.
+   */
+  listOwnerEmails(orgId: Uuid): Promise<ExpiryResult<string[]>>;
 
   /** Items past their date that are still `active`/`expiring`. */
   listOverdueItems(today: string, limit: number): Promise<ExpiryResult<ExpiryItem[]>>;

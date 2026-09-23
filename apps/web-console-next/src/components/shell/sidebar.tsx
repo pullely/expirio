@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
 import {
   Building2,
+  CalendarClock,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -35,6 +36,7 @@ import { SidebarFind } from "./sidebar-find";
 
 const ICONS: Record<string, LucideIcon> = {
   Building2,
+  CalendarClock,
   FolderKanban,
   Boxes,
   KeyRound,

@@ -27,4 +27,9 @@ export const qk = {
   billingSummary: (orgId: string) => ["billingSummary", orgId] as const,
   entitlements: (orgId: string) => ["entitlements", orgId] as const,
   invoices: (orgId: string) => ["invoices", orgId] as const,
+  expiryItems: (orgId: string, filters: string = "") => ["expiryItems", orgId, filters] as const,
+  expiryItem: (orgId: string, itemId: string) => ["expiryItem", orgId, itemId] as const,
+  expiryReminders: (orgId: string, itemId: string) => ["expiryReminders", orgId, itemId] as const,
+  expiryTemplates: (orgId: string) => ["expiryTemplates", orgId] as const,
+  expiryScorecard: (orgId: string) => ["expiryScorecard", orgId] as const,
 };

@@ -84,3 +84,4 @@ spec:
 
 # ci: re-trigger deploy (batch C — integrations + api-edge gateway, 20260622T141448Z)
 # orun: redeploy 04-workers 20260923T043440Z
+# redeploy: EX-3 carries the cirrus D1 fix (appendEventWithAudit + membership writes, no Postgres-only SQL)

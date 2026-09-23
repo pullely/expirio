@@ -1,0 +1,47 @@
+apiVersion: orun.io/v1
+kind: TaskContract
+metadata:
+  name: EX-3
+spec:
+  goal: The vertical templates, the escalating holder-to-manager-to-owner reminder sweep and the compliance scorecard are live, and the console shows them. Carries the cirrus D1 fix (appendEventWithAudit and the membership writes) and redeploys every worker that bundles it.
+  affects:
+    - default/expirio/db
+    - default/expirio/db-tests
+    - default/expirio/db-migrate
+    - default/expirio/contracts
+    - default/expirio/contracts-tests
+    - default/expirio/sdk
+    - default/expirio/expiry-worker
+    - default/expirio/expiry-worker-tests
+    - default/expirio/api-edge
+    - default/expirio/api-edge-tests
+    - default/expirio/notifications-worker
+    - default/expirio/notifications-worker-tests
+    - default/expirio/web-console-next
+    - default/expirio/web-console-next-tests
+    - default/expirio/membership-worker
+    - default/expirio/membership-worker-tests
+    - default/expirio/admin-worker
+    - default/expirio/admin-worker-tests
+    - default/expirio/billing-worker
+    - default/expirio/billing-worker-tests
+    - default/expirio/config-worker
+    - default/expirio/config-worker-tests
+    - default/expirio/identity-worker
+    - default/expirio/identity-worker-tests
+    - default/expirio/integrations-worker
+    - default/expirio/integrations-worker-tests
+    - default/expirio/projects-worker
+    - default/expirio/projects-worker-tests
+    - default/expirio/webhooks-worker
+    - default/expirio/webhooks-worker-tests
+    - default/expirio/events-worker
+    - default/expirio/events-worker-tests
+  doneWhen:
+    - GET expiry-templates returns clinic, trades and childcare, and applying one creates its items in a single call
+    - the scheduled sweep sends a due reminder exactly once and records its notification id
+    - a renewed item's unsent reminder rows become skipped and the new date's ladder is pending
+    - expiry.reminder.sent and expiry.item.renewed are appended to the event log with audit entries
+    - an organization can be created on stage and an audited write leaves an audit row (the D1 fix is live)
+    - the console register and scorecard render against stage
+  gates: []
