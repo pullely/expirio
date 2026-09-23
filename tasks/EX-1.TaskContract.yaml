@@ -1,0 +1,13 @@
+apiVersion: orun.io/v1
+kind: TaskContract
+metadata:
+  name: EX-1
+spec:
+  goal: The Expirio epic's five design documents are on main and attached to the epic in Orunbase.
+  affects:
+    - specs/epics/expirio-expiry-tracking
+    - tasks
+  doneWhen:
+    - specs/epics/expirio-expiry-tracking holds README.md, design.md, implementation-plan.md, risks-and-open-questions.md and IMPLEMENTATION-STATUS.md on main
+    - orun spec list --epic expirio-expiry-tracking shows all five documents
+  gates: []
