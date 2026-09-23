@@ -33,6 +33,14 @@
           "database_id": "@@wiring(cloudflare-d1/stage:d1_database_id)@@"
         }
       ],
+      // EX3: certificate scans and PDFs. Bound by name — the cloudflare-r2
+      // component names the bucket deterministically.
+      "r2_buckets": [
+        {
+          "binding": "DOCUMENTS",
+          "bucket_name": "expirio-documents-stage"
+        }
+      ],
       "services": [
         {
           "binding": "MEMBERSHIP_WORKER",
@@ -62,6 +70,14 @@
           "binding": "PLATFORM_DB",
           "database_name": "expirio-prod",
           "database_id": "@@wiring(cloudflare-d1/prod:d1_database_id)@@"
+        }
+      ],
+      // EX3: certificate scans and PDFs. Bound by name — the cloudflare-r2
+      // component names the bucket deterministically.
+      "r2_buckets": [
+        {
+          "binding": "DOCUMENTS",
+          "bucket_name": "expirio-documents-prod"
         }
       ],
       "services": [

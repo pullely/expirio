@@ -71,6 +71,9 @@ export const EXPIRY_EVENT_TYPES = [
   "expiry.item.expired",
   "expiry.reminder.sent",
   "expiry.document.attached",
+  "expiry.renewal_link.created",
+  "expiry.feed.created",
+  "expiry.feed.revoked",
 ] as const;
 
 export type ExpiryEventType = (typeof EXPIRY_EVENT_TYPES)[number];
@@ -229,4 +232,112 @@ export interface GetExpiryScorecardResponse {
   horizonDays: number;
   totals: Omit<PublicExpiryScorecardRow, "projectId">;
   locations: PublicExpiryScorecardRow[];
+}
+
+// ---------------------------------------------------------------------------
+// EX3 — documents, the renewal link, the feed
+// ---------------------------------------------------------------------------
+
+/** Documents are certificate scans and PDFs, at most 10 MB. */
+export const EXPIRY_DOCUMENT_MAX_BYTES = 10 * 1024 * 1024;
+export const EXPIRY_DOCUMENT_CONTENT_TYPES = [
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+] as const;
+
+/** A renewal link lives 14 days and works once. */
+export const EXPIRY_RENEWAL_LINK_TTL_DAYS = 14;
+
+export interface PublicExpiryDocument {
+  id: string;
+  orgId: string;
+  itemId: string;
+  filename: string;
+  contentType: string;
+  sizeBytes: number;
+  sha256: string;
+  source: "console" | "renewal_link";
+  uploadedAt: string;
+}
+
+export interface UploadExpiryDocumentResponse {
+  document: PublicExpiryDocument;
+}
+
+export interface ListExpiryDocumentsResponse {
+  documents: PublicExpiryDocument[];
+}
+
+export interface PublicExpiryRenewalLink {
+  id: string;
+  itemId: string;
+  expiresAt: string;
+  consumedAt: string | null;
+  createdAt: string;
+}
+
+/**
+ * The raw token is returned ONCE, here; only its SHA-256 is stored. `path` is
+ * the console's public renewal page — prefix it with the console origin.
+ */
+export interface CreateExpiryRenewalLinkResponse {
+  link: PublicExpiryRenewalLink;
+  token: string;
+  path: string;
+}
+
+export interface PublicExpiryFeed {
+  id: string;
+  orgId: string;
+  projectId: string | null;
+  label: string;
+  revokedAt: string | null;
+  lastUsedAt: string | null;
+  createdAt: string;
+}
+
+export interface CreateExpiryFeedRequest {
+  label: string;
+  projectId?: string | null;
+}
+
+/** The raw token is returned ONCE; `path` is the ICS URL path on the API edge. */
+export interface CreateExpiryFeedResponse {
+  feed: PublicExpiryFeed;
+  token: string;
+  path: string;
+}
+
+export interface ListExpiryFeedsResponse {
+  feeds: PublicExpiryFeed[];
+}
+
+export interface RevokeExpiryFeedResponse {
+  feed: { id: string; revoked: true };
+}
+
+/**
+ * `GET /ingress/expirio/renew?token=` — what a holder sees on the public
+ * renewal page. No licence number, no email address, no org id.
+ */
+export interface PublicRenewalFormResponse {
+  item: {
+    name: string;
+    kind: ExpiryItemKind;
+    issuer: string | null;
+    holderName: string | null;
+    expiresOn: string;
+  };
+  linkExpiresAt: string;
+  maxDocumentBytes: number;
+  acceptedContentTypes: readonly string[];
+}
+
+export interface PublicRenewalSubmitResponse {
+  renewed: true;
+  expiresOn: string;
+  documentAttached: boolean;
 }

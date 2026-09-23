@@ -579,3 +579,126 @@ describe("the expiry sweep's queries, against a real SQLite engine (EX2)", () =>
     expect(aged.ok && aged.value).toBe(true);
   });
 });
+
+describe("the expiry edges' queries, against a real SQLite engine (EX3)", () => {
+  let db: DatabaseSync;
+  let executor: ReturnType<typeof createSqlExecutor>;
+  const orgId = asUuid("21212121-2121-4121-8121-212121212121");
+  const otherOrg = asUuid("31313131-3131-4131-8131-313131313131");
+  const itemId = "41414141-4141-4141-8141-414141414141";
+  const at = new Date("2026-10-01T10:00:00.000Z");
+
+  beforeEach(async () => {
+    db = migratedDatabase();
+    executor = createSqlExecutor(d1Over(db));
+    const repo = createExpiryRepository(executor);
+    const item = await repo.createItem({
+      id: itemId,
+      orgId,
+      projectId: null,
+      name: "OSHA 10 card",
+      kind: "certification",
+      templateKey: null,
+      issuer: null,
+      identifier: "SECRET-NUMBER",
+      holderName: null,
+      holderEmail: null,
+      managerEmail: null,
+      issuedOn: null,
+      expiresOn: "2026-12-01",
+      notes: null,
+      createdBy: null,
+      createdAt: at,
+    });
+    expect(item.ok).toBe(true);
+  });
+
+  afterEach(() => {
+    db.close();
+  });
+
+  it("scopes a document read by org", async () => {
+    const repo = createExpiryRepository(executor);
+    const doc = await repo.createDocument({
+      id: "51515151-5151-4151-8151-515151515151",
+      orgId,
+      itemId,
+      r2Key: `${orgId}/${itemId}/51515151-5151-4151-8151-515151515151`,
+      filename: "card.pdf",
+      contentType: "application/pdf",
+      sizeBytes: 1234,
+      sha256: "ab".repeat(32),
+      source: "console",
+      uploadedBy: null,
+      uploadedAt: at,
+    });
+    expect(doc.ok).toBe(true);
+    expect((await repo.getDocument(orgId, "51515151-5151-4151-8151-515151515151")).ok).toBe(true);
+    const cross = await repo.getDocument(otherOrg, "51515151-5151-4151-8151-515151515151");
+    expect(cross).toEqual({ ok: false, error: { kind: "not_found" } });
+    const listed = await repo.listDocuments(orgId, itemId);
+    expect(listed.ok && listed.value.map((d) => d.sizeBytes)).toEqual([1234]);
+  });
+
+  it("consumes a renewal link exactly once, and never after it expires", async () => {
+    const repo = createExpiryRepository(executor);
+    const link = await repo.createRenewalLink({
+      id: "61616161-6161-4161-8161-616161616161",
+      orgId,
+      itemId,
+      tokenHash: "hash-live",
+      createdBy: null,
+      expiresAt: new Date("2026-10-15T10:00:00.000Z"),
+      createdAt: at,
+    });
+    expect(link.ok).toBe(true);
+    expect((await repo.findRenewalLinkByHash("hash-live", at)).ok).toBe(true);
+    const first = await repo.consumeRenewalLink("61616161-6161-4161-8161-616161616161", at);
+    const second = await repo.consumeRenewalLink("61616161-6161-4161-8161-616161616161", at);
+    expect(first.ok && first.value).toBe(true);
+    expect(second.ok && second.value).toBe(false);
+    expect((await repo.findRenewalLinkByHash("hash-live", at)).ok).toBe(false);
+
+    await repo.createRenewalLink({
+      id: "71717171-7171-4171-8171-717171717171",
+      orgId,
+      itemId,
+      tokenHash: "hash-old",
+      createdBy: null,
+      expiresAt: new Date("2026-09-30T10:00:00.000Z"),
+      createdAt: at,
+    });
+    expect((await repo.findRenewalLinkByHash("hash-old", at)).ok).toBe(false);
+    const late = await repo.consumeRenewalLink("71717171-7171-4171-8171-717171717171", at);
+    expect(late.ok && late.value).toBe(false);
+  });
+
+  it("serves a feed until it is revoked, with name, kind and date only", async () => {
+    const repo = createExpiryRepository(executor);
+    const feed = await repo.createFeedToken({
+      id: "81818181-8181-4181-8181-818181818181",
+      orgId,
+      projectId: null,
+      label: "Front desk",
+      tokenHash: "feed-hash",
+      createdBy: null,
+      createdAt: at,
+    });
+    expect(feed.ok).toBe(true);
+    expect((await repo.findFeedTokenByHash("feed-hash")).ok).toBe(true);
+    const entries = await repo.listFeedEntries(orgId, null, "2026-09-24", 50);
+    expect(entries.ok && entries.value.map((e) => [e.name, e.kind, e.expiresOn])).toEqual([
+      ["OSHA 10 card", "certification", "2026-12-01"],
+    ]);
+    expect(JSON.stringify(entries)).not.toContain("SECRET-NUMBER");
+    const scoped = await repo.listFeedEntries(orgId, "91919191-9191-4191-8191-919191919191", "2026-09-24", 50);
+    expect(scoped.ok && scoped.value).toEqual([]);
+    expect((await repo.touchFeedToken("81818181-8181-4181-8181-818181818181", at)).ok).toBe(true);
+
+    const revoked = await repo.revokeFeedToken(orgId, "81818181-8181-4181-8181-818181818181", at);
+    expect(revoked.ok && revoked.value).toBe(true);
+    expect((await repo.findFeedTokenByHash("feed-hash")).ok).toBe(false);
+    const again = await repo.revokeFeedToken(orgId, "81818181-8181-4181-8181-818181818181", at);
+    expect(again.ok && again.value).toBe(false);
+  });
+});

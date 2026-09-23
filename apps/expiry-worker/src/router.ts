@@ -10,8 +10,26 @@ import { handleListReminders } from "./handlers/list-reminders.js";
 import { handleListTemplates } from "./handlers/list-templates.js";
 import { handleApplyTemplate } from "./handlers/apply-template.js";
 import { handleScorecard } from "./handlers/scorecard.js";
+import {
+  handleDocumentContent,
+  handleListDocuments,
+  handleUploadDocument,
+} from "./handlers/documents.js";
+import {
+  handleCreateFeed,
+  handleCreateRenewalLink,
+  handleListFeeds,
+  handleRevokeFeed,
+} from "./handlers/links-and-feeds.js";
+import { CALENDAR_PATH, RENEW_PATH, routePublicIngress } from "./handlers/public-ingress.js";
 import { errorResponse, methodNotAllowed, notFound } from "./http.js";
-import { generateRequestId, parseExpiryItemPublicId, parseOrgPublicId } from "./ids.js";
+import {
+  generateRequestId,
+  parseExpiryDocumentPublicId,
+  parseExpiryFeedPublicId,
+  parseExpiryItemPublicId,
+  parseOrgPublicId,
+} from "./ids.js";
 
 const REQUEST_ID_RE = /^[\w-]{1,128}$/;
 
@@ -44,6 +62,11 @@ const ORG_ITEM_REMINDERS_RE = /^\/v1\/organizations\/([^/]+)\/expiry-items\/([^/
 const ORG_TEMPLATES_RE = /^\/v1\/organizations\/([^/]+)\/expiry-templates$/;
 const ORG_TEMPLATE_APPLY_RE = /^\/v1\/organizations\/([^/]+)\/expiry-templates\/([a-z0-9-]{1,32})\/apply$/;
 const ORG_SCORECARD_RE = /^\/v1\/organizations\/([^/]+)\/expiry-scorecard$/;
+const ORG_ITEM_DOCUMENTS_RE = /^\/v1\/organizations\/([^/]+)\/expiry-items\/([^/]+)\/documents$/;
+const ORG_DOCUMENT_CONTENT_RE = /^\/v1\/organizations\/([^/]+)\/expiry-documents\/([^/]+)\/content$/;
+const ORG_ITEM_LINKS_RE = /^\/v1\/organizations\/([^/]+)\/expiry-items\/([^/]+)\/renewal-links$/;
+const ORG_FEEDS_RE = /^\/v1\/organizations\/([^/]+)\/expiry-feeds$/;
+const ORG_FEED_ID_RE = /^\/v1\/organizations\/([^/]+)\/expiry-feeds\/([^/]+)$/;
 
 export async function route(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
@@ -52,6 +75,62 @@ export async function route(request: Request, env: Env): Promise<Response> {
   try {
     if (url.pathname === "/health" && request.method === "GET") {
       return handleHealth(env, requestId);
+    }
+
+    // EX3: the public paths carry no actor — the bearer token is the authorization.
+    if (url.pathname === RENEW_PATH || url.pathname === CALENDAR_PATH) {
+      return routePublicIngress(request, env, requestId, url.pathname);
+    }
+
+    const itemScoped =
+      url.pathname.match(ORG_ITEM_DOCUMENTS_RE) ?? url.pathname.match(ORG_ITEM_LINKS_RE);
+    if (itemScoped) {
+      const isDocuments = ORG_ITEM_DOCUMENTS_RE.test(url.pathname);
+      const orgUuid = parseOrgPublicId(itemScoped[1]!);
+      const itemUuid = parseExpiryItemPublicId(itemScoped[2]!);
+      if (!orgUuid || !itemUuid) return errorResponse("not_found", "Not found", 404, requestId);
+      const actor = resolveActor(request);
+      if (!actor) return errorResponse("unauthenticated", "Authentication required", 401, requestId);
+      if (isDocuments) {
+        if (request.method === "POST") return handleUploadDocument(request, env, requestId, actor, orgUuid, itemUuid);
+        if (request.method === "GET") return handleListDocuments(env, requestId, actor, orgUuid, itemUuid);
+        return methodNotAllowed(requestId);
+      }
+      if (request.method !== "POST") return methodNotAllowed(requestId);
+      return handleCreateRenewalLink(env, requestId, actor, orgUuid, itemUuid);
+    }
+
+    const contentMatch = url.pathname.match(ORG_DOCUMENT_CONTENT_RE);
+    if (contentMatch) {
+      if (request.method !== "GET") return methodNotAllowed(requestId);
+      const orgUuid = parseOrgPublicId(contentMatch[1]!);
+      const docUuid = parseExpiryDocumentPublicId(contentMatch[2]!);
+      if (!orgUuid || !docUuid) return errorResponse("not_found", "Not found", 404, requestId);
+      const actor = resolveActor(request);
+      if (!actor) return errorResponse("unauthenticated", "Authentication required", 401, requestId);
+      return handleDocumentContent(env, requestId, actor, orgUuid, docUuid);
+    }
+
+    const feedsMatch = url.pathname.match(ORG_FEEDS_RE);
+    if (feedsMatch) {
+      const orgUuid = parseOrgPublicId(feedsMatch[1]!);
+      if (!orgUuid) return errorResponse("not_found", "Not found", 404, requestId);
+      const actor = resolveActor(request);
+      if (!actor) return errorResponse("unauthenticated", "Authentication required", 401, requestId);
+      if (request.method === "POST") return handleCreateFeed(request, env, requestId, actor, orgUuid);
+      if (request.method === "GET") return handleListFeeds(env, requestId, actor, orgUuid);
+      return methodNotAllowed(requestId);
+    }
+
+    const feedIdMatch = url.pathname.match(ORG_FEED_ID_RE);
+    if (feedIdMatch) {
+      if (request.method !== "DELETE") return methodNotAllowed(requestId);
+      const orgUuid = parseOrgPublicId(feedIdMatch[1]!);
+      const feedUuid = parseExpiryFeedPublicId(feedIdMatch[2]!);
+      if (!orgUuid || !feedUuid) return errorResponse("not_found", "Not found", 404, requestId);
+      const actor = resolveActor(request);
+      if (!actor) return errorResponse("unauthenticated", "Authentication required", 401, requestId);
+      return handleRevokeFeed(env, requestId, actor, orgUuid, feedUuid);
     }
 
     const templatesMatch = url.pathname.match(ORG_TEMPLATES_RE);

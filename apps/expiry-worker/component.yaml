@@ -12,6 +12,8 @@ spec:
   dependsOn:
     # Runbook trap 21: the migration deploys before code that reads its tables.
     - component: db-migrate
+    # EX3: the DOCUMENTS binding names a bucket this component creates.
+    - component: cloudflare-r2
     - component: notifications-worker
     - component: membership-worker
     - component: policy-worker

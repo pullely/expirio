@@ -56,3 +56,23 @@ export function actorSubjectUuid(subjectId: string): string | null {
   if (isUuid(subjectId)) return subjectId;
   return uuidFromPublicId(subjectId);
 }
+
+export function expiryDocumentPublicId(uuid: string): string {
+  return `exd_${uuidToHex(uuid)}`;
+}
+
+export function parseExpiryDocumentPublicId(publicId: string): Uuid | null {
+  return uuidFromPublicId(publicId, "exd");
+}
+
+export function expiryLinkPublicId(uuid: string): string {
+  return `exl_${uuidToHex(uuid)}`;
+}
+
+export function expiryFeedPublicId(uuid: string): string {
+  return `exf_${uuidToHex(uuid)}`;
+}
+
+export function parseExpiryFeedPublicId(publicId: string): Uuid | null {
+  return uuidFromPublicId(publicId, "exf");
+}

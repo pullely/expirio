@@ -192,5 +192,14 @@ export const manifest: MigrationManifest = {
       description:
         "Expiry persistence foundation (EX1) — tracked items (licences, permits, policies, certifications) scoped to an organization and optionally to a project-as-location, plus the materialised 90/60/30/7/0 reminder ladder whose UNIQUE (item_id, offset_days) index is what makes a duplicate chase impossible",
     },
+    {
+      id: "210_expiry_edges",
+      context: "expiry",
+      path: "210_expiry_edges/up.sql",
+      checksum:
+        "aa8f15ed565b184634aac67664e9773f8be4614a3ea7d2cbc52ed24b4e017352",
+      description:
+        "Expiry's open edges (EX3) — documents stored in R2 and indexed here, the single-use no-account renewal link, and the revocable ICS feed token; both public tokens stored only as SHA-256 hashes",
+    },
   ],
 };

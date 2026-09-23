@@ -38,7 +38,7 @@ sent. No cron yet — the rows exist, nothing reads them.
 - `tests/expiry-worker` is green in the repo's `quick-check` lane
 - an unauthorized subject gets `not_found`/404, not `forbidden`/403
 
-## EX2 — templates, the ladder, the scorecard
+## EX2 — templates, the ladder, the scorecard ✅
 
 The first user-visible change. `apps/expiry-worker` gains the vertical template
 catalogue (clinic, trades, childcare) with a read route and an apply route that
@@ -66,7 +66,7 @@ nav entry.
 - `orgs/[orgSlug]/expiry` and `…/expiry/scorecard` render against stage, and the
   console build and `tests/web-console-next` are green
 
-## EX3 — documents, the renewal link, the feed
+## EX3 — documents, the renewal link, the feed ✅
 
 The open edges. A new `infra/terraform/cloudflare-r2` component provisions one
 bucket per environment and publishes its name through the wiring seam;

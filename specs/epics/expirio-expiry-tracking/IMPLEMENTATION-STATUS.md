@@ -8,7 +8,7 @@ code departed from `design.md`.
 | EX0 — the spec | ✅ merged | #8 |
 | EX1 — the tracked item and its clock | ✅ merged — but see departure 1: its audited writes 503'd on D1 until #10 | #9 |
 | EX2 — templates, the ladder, the scorecard | built, PR open (task EX-3) | #10 |
-| EX3 — documents, the renewal link, the feed | | |
+| EX3 — documents, the renewal link, the feed | built, PR open (task EX-4), stacked on #10 | #11 |
 
 ## Departures from the design
 
@@ -39,3 +39,26 @@ code departed from `design.md`.
    the manager, then the owner; a manager rung with no manager goes to the
    owner; a rung with nobody at all is marked `failed`. §4 did not say.
 6. **Not yet wired:** the `expiry.reminders_sent` usage metric (§4 Metering).
+7. **EX3 authorization reuses the EX1 actions (#11).** Document upload is
+   `expiry.item.update`, document read `expiry.item.read`, minting a renewal
+   link `expiry.item.renew`, and managing calendar feeds `expiry.item.delete`
+   (the admin/owner action) — not the `expiry.document.*`, `expiry.link.create`
+   and `expiry.feed.manage` actions §2 names. Same reason as departure 3: the
+   policy package and policy-worker stay untouched.
+8. **Feeds can be revoked through the API (#11):** `DELETE
+   /v1/organizations/{org}/expiry-feeds/{id}`, which §2 did not list but "revocable"
+   requires. Three event types join `EXPIRY_EVENT_TYPES`:
+   `expiry.renewal_link.created`, `expiry.feed.created`, `expiry.feed.revoked`.
+9. **The R2 bucket is bound by name (#11),** `expirio-documents-<env>`, not
+   through a `@@wiring(cloudflare-r2/…)@@` token — an R2 binding resolves by
+   name, and a deterministic name removes the worker's deploy-time dependency on
+   the wiring secret. The component still lease-publishes `WIRING_CLOUDFLARE_R2`.
+   Its terraform runs under a brokered `CLOUDFLARE_R2_TOKEN` (`r2-data`
+   template), minted for stage and prod before the PR.
+10. **The holder's renewal page is `/renew` on the console (#11),** a public
+    page outside the signed-in shell that calls the two `/ingress/expirio/renew`
+    paths with a client carrying no session token. A document upload is
+    `POST …/documents` with the file as the body and the name in `?filename=`
+    (or `x-filename`), rather than multipart.
+11. **The feed looks back seven days,** so an item that lapsed this week is
+    still on the calendar, and carries at most 500 entries.
