@@ -60,6 +60,9 @@ interface PerformInput {
   path: string;
   query?: Record<string, string | number | undefined> | undefined;
   body?: unknown;
+  /** A non-JSON body (a file upload), sent as-is with `contentType`. */
+  rawBody?: BodyInit;
+  contentType?: string;
 }
 
 /**
@@ -113,6 +116,27 @@ export class Transport {
     return this.performRequest<T>(input, opts);
   }
 
+  /**
+   * A request whose success body is NOT the JSON envelope — a document's bytes.
+   * Errors still decode into the typed error classes.
+   */
+  async requestBinary(input: PerformInput, opts: RequestOptions = {}): Promise<Response> {
+    const url = this.buildUrl(input.path, input.query);
+    const requestId = opts.requestId ?? generateRequestId();
+    const headers = new Headers();
+    for (const [k, v] of Object.entries(this.defaultHeaders)) headers.set(k, v);
+    if (this.auth) applyAuth(headers, this.auth);
+    headers.set("x-request-id", requestId);
+    if (opts.headers) {
+      for (const [k, v] of Object.entries(opts.headers)) headers.set(k, v);
+    }
+    const init: RequestInit = { method: input.method, headers };
+    if (opts.signal !== undefined) init.signal = opts.signal;
+    const response = await this.fetchImpl(url, init);
+    if (!response.ok) throw await decodeError(response, requestId);
+    return response;
+  }
+
   private async performRequest<T>(
     input: PerformInput,
     opts: RequestOptions,
@@ -125,7 +149,10 @@ export class Transport {
     if (this.auth) applyAuth(headers, this.auth);
 
     let body: BodyInit | undefined;
-    if (input.body !== undefined) {
+    if (input.rawBody !== undefined) {
+      headers.set("content-type", input.contentType ?? "application/octet-stream");
+      body = input.rawBody;
+    } else if (input.body !== undefined) {
       headers.set("content-type", "application/json");
       body = JSON.stringify(input.body);
     }

@@ -135,6 +135,88 @@ export interface ListExpiryItemsFilter {
   expiresAfter?: string;
 }
 
+// ---------------------------------------------------------------------------
+// EX3 — documents, renewal links, feed tokens
+// ---------------------------------------------------------------------------
+
+export interface ExpiryDocument {
+  id: string;
+  orgId: string;
+  itemId: string;
+  r2Key: string;
+  filename: string;
+  contentType: string;
+  sizeBytes: number;
+  sha256: string;
+  source: string;
+  uploadedBy: string | null;
+  uploadedAt: Date;
+}
+
+export interface CreateExpiryDocumentInput {
+  id: string;
+  orgId: Uuid;
+  itemId: string;
+  r2Key: string;
+  filename: string;
+  contentType: string;
+  sizeBytes: number;
+  sha256: string;
+  source: "console" | "renewal_link";
+  uploadedBy: string | null;
+  uploadedAt: Date;
+}
+
+export interface ExpiryRenewalLink {
+  id: string;
+  orgId: string;
+  itemId: string;
+  createdBy: string | null;
+  expiresAt: Date;
+  consumedAt: Date | null;
+  createdAt: Date;
+}
+
+export interface CreateExpiryRenewalLinkInput {
+  id: string;
+  orgId: Uuid;
+  itemId: string;
+  tokenHash: string;
+  createdBy: string | null;
+  expiresAt: Date;
+  createdAt: Date;
+}
+
+export interface ExpiryFeedToken {
+  id: string;
+  orgId: string;
+  projectId: string | null;
+  label: string;
+  createdBy: string | null;
+  revokedAt: Date | null;
+  lastUsedAt: Date | null;
+  createdAt: Date;
+}
+
+export interface CreateExpiryFeedTokenInput {
+  id: string;
+  orgId: Uuid;
+  projectId: string | null;
+  label: string;
+  tokenHash: string;
+  createdBy: string | null;
+  createdAt: Date;
+}
+
+/** The only fields a public feed ever carries. */
+export interface ExpiryFeedEntry {
+  id: string;
+  name: string;
+  kind: string;
+  expiresOn: string;
+  updatedAt: Date;
+}
+
 export interface ExpiryRepository {
   createItem(input: CreateExpiryItemInput): Promise<ExpiryResult<ExpiryItem>>;
   getItemById(orgId: Uuid, itemId: string): Promise<ExpiryResult<ExpiryItem>>;
@@ -178,4 +260,31 @@ export interface ExpiryRepository {
   setItemStatus(orgId: string, itemId: string, status: string, at: Date): Promise<ExpiryResult<boolean>>;
 
   scorecard(orgId: Uuid, today: string, horizon: string): Promise<ExpiryResult<ScorecardRow[]>>;
+
+  // EX3 — documents
+  createDocument(input: CreateExpiryDocumentInput): Promise<ExpiryResult<ExpiryDocument>>;
+  listDocuments(orgId: Uuid, itemId: string): Promise<ExpiryResult<ExpiryDocument[]>>;
+  getDocument(orgId: Uuid, documentId: string): Promise<ExpiryResult<ExpiryDocument>>;
+
+  // EX3 — the renewal link
+  createRenewalLink(input: CreateExpiryRenewalLinkInput): Promise<ExpiryResult<ExpiryRenewalLink>>;
+  /** Live link only: unconsumed and unexpired at `at`. */
+  findRenewalLinkByHash(tokenHash: string, at: Date): Promise<ExpiryResult<ExpiryRenewalLink>>;
+  /** The single use — true only for the call that flipped `consumed_at`. */
+  consumeRenewalLink(id: string, at: Date): Promise<ExpiryResult<boolean>>;
+
+  // EX3 — the feed
+  createFeedToken(input: CreateExpiryFeedTokenInput): Promise<ExpiryResult<ExpiryFeedToken>>;
+  listFeedTokens(orgId: Uuid): Promise<ExpiryResult<ExpiryFeedToken[]>>;
+  revokeFeedToken(orgId: Uuid, id: string, at: Date): Promise<ExpiryResult<boolean>>;
+  /** Unrevoked token only. */
+  findFeedTokenByHash(tokenHash: string): Promise<ExpiryResult<ExpiryFeedToken>>;
+  touchFeedToken(id: string, at: Date): Promise<ExpiryResult<boolean>>;
+  /** Non-archived items expiring on or after `from`, scoped to one location or (null) the whole org. */
+  listFeedEntries(
+    orgId: string,
+    projectId: string | null,
+    from: string,
+    limit: number,
+  ): Promise<ExpiryResult<ExpiryFeedEntry[]>>;
 }

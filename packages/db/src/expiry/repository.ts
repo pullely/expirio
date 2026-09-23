@@ -2,8 +2,15 @@ import type { SqlExecutor } from "../d1/executor.js";
 import type {
   CreateExpiryItemInput,
   CreateExpiryReminderInput,
+  CreateExpiryDocumentInput,
+  CreateExpiryFeedTokenInput,
+  CreateExpiryRenewalLinkInput,
   CursorPosition,
   DueReminder,
+  ExpiryDocument,
+  ExpiryFeedEntry,
+  ExpiryFeedToken,
+  ExpiryRenewalLink,
   ExpiryItem,
   ExpiryReminder,
   ExpiryRepository,
@@ -60,6 +67,51 @@ function mapReminder(row: Record<string, unknown>): ExpiryReminder {
     updatedAt: new Date(row.updated_at as string),
   };
 }
+
+function mapDocument(row: Record<string, unknown>): ExpiryDocument {
+  return {
+    id: row.id as string,
+    orgId: row.org_id as string,
+    itemId: row.item_id as string,
+    r2Key: row.r2_key as string,
+    filename: row.filename as string,
+    contentType: row.content_type as string,
+    sizeBytes: Number(row.size_bytes),
+    sha256: row.sha256 as string,
+    source: row.source as string,
+    uploadedBy: str(row.uploaded_by),
+    uploadedAt: new Date(row.uploaded_at as string),
+  };
+}
+
+function mapLink(row: Record<string, unknown>): ExpiryRenewalLink {
+  return {
+    id: row.id as string,
+    orgId: row.org_id as string,
+    itemId: row.item_id as string,
+    createdBy: str(row.created_by),
+    expiresAt: new Date(row.expires_at as string),
+    consumedAt: row.consumed_at ? new Date(row.consumed_at as string) : null,
+    createdAt: new Date(row.created_at as string),
+  };
+}
+
+function mapFeedToken(row: Record<string, unknown>): ExpiryFeedToken {
+  return {
+    id: row.id as string,
+    orgId: row.org_id as string,
+    projectId: str(row.project_id),
+    label: row.label as string,
+    createdBy: str(row.created_by),
+    revokedAt: row.revoked_at ? new Date(row.revoked_at as string) : null,
+    lastUsedAt: row.last_used_at ? new Date(row.last_used_at as string) : null,
+    createdAt: new Date(row.created_at as string),
+  };
+}
+
+// Token hashes never leave the repository: the mapped shapes above omit them.
+const LINK_COLUMNS = "id, org_id, item_id, created_by, expires_at, consumed_at, created_at";
+const FEED_COLUMNS = "id, org_id, project_id, label, created_by, revoked_at, last_used_at, created_at";
 
 function safeError(message: string): ExpiryResult<never> {
   return { ok: false, error: { kind: "internal", message } };
@@ -505,5 +557,218 @@ export function createExpiryRepository(executor: SqlExecutor): ExpiryRepository 
         return safeError("Failed to build the scorecard");
       }
     },
+
+    async createDocument(input: CreateExpiryDocumentInput): Promise<ExpiryResult<ExpiryDocument>> {
+      try {
+        const result = await executor.execute<Record<string, unknown>>(
+          `INSERT INTO expiry_documents
+             (id, org_id, item_id, r2_key, filename, content_type, size_bytes, sha256, source, uploaded_by, uploaded_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+           RETURNING *`,
+          [
+            input.id,
+            input.orgId,
+            input.itemId,
+            input.r2Key,
+            input.filename,
+            input.contentType,
+            input.sizeBytes,
+            input.sha256,
+            input.source,
+            input.uploadedBy,
+            input.uploadedAt.toISOString(),
+          ],
+        );
+        if (result.rowCount === 0) return safeError("Failed to record the document");
+        return { ok: true, value: mapDocument(result.rows[0]!) };
+      } catch (err: unknown) {
+        if (isUniqueViolation(err)) return { ok: false, error: { kind: "conflict", entity: "expiry_document" } };
+        return safeError("Failed to record the document");
+      }
+    },
+
+    async listDocuments(orgId: string, itemId: string): Promise<ExpiryResult<ExpiryDocument[]>> {
+      try {
+        const result = await executor.execute<Record<string, unknown>>(
+          `SELECT * FROM expiry_documents WHERE org_id = $1 AND item_id = $2
+           ORDER BY uploaded_at DESC, id DESC`,
+          [orgId, itemId],
+        );
+        return { ok: true, value: result.rows.map(mapDocument) };
+      } catch {
+        return safeError("Failed to list documents");
+      }
+    },
+
+    async getDocument(orgId: string, documentId: string): Promise<ExpiryResult<ExpiryDocument>> {
+      try {
+        const result = await executor.execute<Record<string, unknown>>(
+          `SELECT * FROM expiry_documents WHERE org_id = $1 AND id = $2`,
+          [orgId, documentId],
+        );
+        if (result.rowCount === 0) return { ok: false, error: { kind: "not_found" } };
+        return { ok: true, value: mapDocument(result.rows[0]!) };
+      } catch {
+        return safeError("Failed to read the document");
+      }
+    },
+
+    async createRenewalLink(input: CreateExpiryRenewalLinkInput): Promise<ExpiryResult<ExpiryRenewalLink>> {
+      try {
+        const result = await executor.execute<Record<string, unknown>>(
+          `INSERT INTO expiry_renewal_links (id, org_id, item_id, token_hash, created_by, expires_at, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
+           RETURNING ${LINK_COLUMNS}`,
+          [
+            input.id,
+            input.orgId,
+            input.itemId,
+            input.tokenHash,
+            input.createdBy,
+            input.expiresAt.toISOString(),
+            input.createdAt.toISOString(),
+          ],
+        );
+        if (result.rowCount === 0) return safeError("Failed to mint the renewal link");
+        return { ok: true, value: mapLink(result.rows[0]!) };
+      } catch {
+        return safeError("Failed to mint the renewal link");
+      }
+    },
+
+    async findRenewalLinkByHash(tokenHash: string, at: Date): Promise<ExpiryResult<ExpiryRenewalLink>> {
+      try {
+        const result = await executor.execute<Record<string, unknown>>(
+          `SELECT ${LINK_COLUMNS} FROM expiry_renewal_links
+           WHERE token_hash = $1 AND consumed_at IS NULL AND expires_at > $2`,
+          [tokenHash, at.toISOString()],
+        );
+        if (result.rowCount === 0) return { ok: false, error: { kind: "not_found" } };
+        return { ok: true, value: mapLink(result.rows[0]!) };
+      } catch {
+        return safeError("Failed to read the renewal link");
+      }
+    },
+
+    async consumeRenewalLink(id: string, at: Date): Promise<ExpiryResult<boolean>> {
+      try {
+        const result = await executor.execute<Record<string, unknown>>(
+          `UPDATE expiry_renewal_links SET consumed_at = $2
+           WHERE id = $1 AND consumed_at IS NULL AND expires_at > $2
+           RETURNING id`,
+          [id, at.toISOString()],
+        );
+        return { ok: true, value: (result.rowCount ?? 0) > 0 };
+      } catch {
+        return safeError("Failed to consume the renewal link");
+      }
+    },
+
+    async createFeedToken(input: CreateExpiryFeedTokenInput): Promise<ExpiryResult<ExpiryFeedToken>> {
+      try {
+        const result = await executor.execute<Record<string, unknown>>(
+          `INSERT INTO expiry_feed_tokens (id, org_id, project_id, label, token_hash, created_by, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
+           RETURNING ${FEED_COLUMNS}`,
+          [
+            input.id,
+            input.orgId,
+            input.projectId,
+            input.label,
+            input.tokenHash,
+            input.createdBy,
+            input.createdAt.toISOString(),
+          ],
+        );
+        if (result.rowCount === 0) return safeError("Failed to mint the feed token");
+        return { ok: true, value: mapFeedToken(result.rows[0]!) };
+      } catch {
+        return safeError("Failed to mint the feed token");
+      }
+    },
+
+    async listFeedTokens(orgId: string): Promise<ExpiryResult<ExpiryFeedToken[]>> {
+      try {
+        const result = await executor.execute<Record<string, unknown>>(
+          `SELECT ${FEED_COLUMNS} FROM expiry_feed_tokens WHERE org_id = $1
+           ORDER BY created_at DESC, id DESC`,
+          [orgId],
+        );
+        return { ok: true, value: result.rows.map(mapFeedToken) };
+      } catch {
+        return safeError("Failed to list feed tokens");
+      }
+    },
+
+    async revokeFeedToken(orgId: string, id: string, at: Date): Promise<ExpiryResult<boolean>> {
+      try {
+        const result = await executor.execute<Record<string, unknown>>(
+          `UPDATE expiry_feed_tokens SET revoked_at = $3
+           WHERE org_id = $1 AND id = $2 AND revoked_at IS NULL
+           RETURNING id`,
+          [orgId, id, at.toISOString()],
+        );
+        return { ok: true, value: (result.rowCount ?? 0) > 0 };
+      } catch {
+        return safeError("Failed to revoke the feed token");
+      }
+    },
+
+    async findFeedTokenByHash(tokenHash: string): Promise<ExpiryResult<ExpiryFeedToken>> {
+      try {
+        const result = await executor.execute<Record<string, unknown>>(
+          `SELECT ${FEED_COLUMNS} FROM expiry_feed_tokens WHERE token_hash = $1 AND revoked_at IS NULL`,
+          [tokenHash],
+        );
+        if (result.rowCount === 0) return { ok: false, error: { kind: "not_found" } };
+        return { ok: true, value: mapFeedToken(result.rows[0]!) };
+      } catch {
+        return safeError("Failed to read the feed token");
+      }
+    },
+
+    async touchFeedToken(id: string, at: Date): Promise<ExpiryResult<boolean>> {
+      try {
+        const result = await executor.execute<Record<string, unknown>>(
+          `UPDATE expiry_feed_tokens SET last_used_at = $2 WHERE id = $1 RETURNING id`,
+          [id, at.toISOString()],
+        );
+        return { ok: true, value: (result.rowCount ?? 0) > 0 };
+      } catch {
+        return safeError("Failed to touch the feed token");
+      }
+    },
+
+    async listFeedEntries(
+      orgId: string,
+      projectId: string | null,
+      from: string,
+      limit: number,
+    ): Promise<ExpiryResult<ExpiryFeedEntry[]>> {
+      try {
+        const scoped = projectId !== null;
+        const result = await executor.execute<Record<string, unknown>>(
+          `SELECT id, name, kind, expires_on, updated_at FROM expiry_items
+           WHERE org_id = $1 AND status <> 'archived' AND expires_on >= $2
+             ${scoped ? "AND project_id = $4" : ""}
+           ORDER BY expires_on ASC, id ASC
+           LIMIT $3`,
+          scoped ? [orgId, from, limit, projectId] : [orgId, from, limit],
+        );
+        return {
+          ok: true,
+          value: result.rows.map((row) => ({
+            id: row.id as string,
+            name: row.name as string,
+            kind: row.kind as string,
+            expiresOn: row.expires_on as string,
+            updatedAt: new Date(row.updated_at as string),
+          })),
+        };
+      } catch {
+        return safeError("Failed to read the feed");
+      }
+    },
+
   };
 }
