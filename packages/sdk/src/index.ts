@@ -22,6 +22,7 @@ import { MeteringClient } from "./metering.js";
 import { NotificationsClient } from "./notifications.js";
 import { OrganizationsClient } from "./organizations.js";
 import { ProjectsClient } from "./projects.js";
+import { ExpiryClient } from "./expiry.js";
 import { SecurityEventsClient } from "./securityEvents.js";
 import { WebhooksClient } from "./webhooks.js";
 import { Transport, type ClientOptions } from "./transport.js";
@@ -29,6 +30,7 @@ import { Transport, type ClientOptions } from "./transport.js";
 export class Expirio {
   readonly organizations: OrganizationsClient;
   readonly projects: ProjectsClient;
+  readonly expiry: ExpiryClient;
   readonly environments: EnvironmentsClient;
   readonly memberships: MembershipsClient;
   readonly apiKeys: ApiKeysClient;
@@ -48,6 +50,7 @@ export class Expirio {
     this.transport = new Transport(options);
     this.organizations = new OrganizationsClient(this.transport);
     this.projects = new ProjectsClient(this.transport);
+    this.expiry = new ExpiryClient(this.transport);
     this.environments = new EnvironmentsClient(this.transport);
     this.memberships = new MembershipsClient(this.transport);
     this.apiKeys = new ApiKeysClient(this.transport);
@@ -66,6 +69,7 @@ export class Expirio {
 // Resource clients (also reachable via `client.<resource>`).
 export { OrganizationsClient } from "./organizations.js";
 export { ProjectsClient } from "./projects.js";
+export { ExpiryClient, type ListExpiryItemsQuery } from "./expiry.js";
 export { EnvironmentsClient } from "./environments.js";
 export { MembershipsClient } from "./memberships.js";
 export {
@@ -166,6 +170,35 @@ export type {
   ListEnvironmentsResponse,
   ArchiveEnvironmentResponse,
 } from "@saas/contracts/projects";
+
+export type {
+  PublicExpiryItem,
+  PublicExpiryReminder,
+  ExpiryItemKind,
+  ExpiryItemStatus,
+  ExpiryReminderTier,
+  ExpiryReminderStatus,
+  ExpiryEventType,
+  CreateExpiryItemRequest,
+  CreateExpiryItemResponse,
+  UpdateExpiryItemRequest,
+  UpdateExpiryItemResponse,
+  GetExpiryItemResponse,
+  ListExpiryItemsResponse,
+  ArchiveExpiryItemResponse,
+  RenewExpiryItemRequest,
+  RenewExpiryItemResponse,
+  ListExpiryRemindersResponse,
+} from "@saas/contracts/expiry";
+
+export {
+  EXPIRY_ITEM_KINDS,
+  EXPIRY_ITEM_STATUSES,
+  EXPIRY_REMINDER_TIERS,
+  EXPIRY_REMINDER_STATUSES,
+  EXPIRY_REMINDER_LADDER,
+  EXPIRY_EVENT_TYPES,
+} from "@saas/contracts/expiry";
 
 export type {
   PublicApiKey,
