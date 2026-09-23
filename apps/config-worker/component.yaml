@@ -94,3 +94,4 @@ spec:
     runtime: cloudflare
 # ci: re-trigger deploy (batch B — membership-dependents, 20260622T140838Z)
 # orun: redeploy 04-workers 20260923T043440Z
+# redeploy: EX-3 carries the cirrus D1 fix (appendEventWithAudit + membership writes, no Postgres-only SQL)

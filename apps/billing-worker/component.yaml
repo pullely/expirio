@@ -77,3 +77,4 @@ spec:
     runtime: cloudflare
 # ci: re-trigger deploy (batch A — runner-starvation recovery 20260622T115650Z)
 # orun: redeploy 04-workers-restore 20260923T050309Z
+# redeploy: EX-3 carries the cirrus D1 fix (appendEventWithAudit + membership writes, no Postgres-only SQL)
