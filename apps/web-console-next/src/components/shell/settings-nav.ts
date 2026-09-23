@@ -121,6 +121,12 @@ export function buildSettingsNav(orgSlug: string, soloMode: boolean = SOLO_MODE)
           description: "Connected providers (GitHub)",
         },
         {
+          href: `${base}/expiry`,
+          label: "Calendar feeds",
+          icon: "CalendarClock",
+          description: "Subscribe a calendar to upcoming expiries",
+        },
+        {
           href: `${base}/config`,
           label: "Config",
           icon: "SlidersHorizontal",

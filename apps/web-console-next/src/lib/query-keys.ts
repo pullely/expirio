@@ -32,4 +32,6 @@ export const qk = {
   expiryReminders: (orgId: string, itemId: string) => ["expiryReminders", orgId, itemId] as const,
   expiryTemplates: (orgId: string) => ["expiryTemplates", orgId] as const,
   expiryScorecard: (orgId: string) => ["expiryScorecard", orgId] as const,
+  expiryDocuments: (orgId: string, itemId: string) => ["expiryDocuments", orgId, itemId] as const,
+  expiryFeeds: (orgId: string) => ["expiryFeeds", orgId] as const,
 };
