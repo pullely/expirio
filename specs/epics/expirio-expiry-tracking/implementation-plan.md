@@ -4,7 +4,7 @@ Milestones land in order. Each is one or more tasks, each task one pull request,
 each pull request landed with `orun pr land`. A milestone is marked ✅ here when
 its "done when" list is true, and recorded in `IMPLEMENTATION-STATUS.md`.
 
-## EX0 — the spec
+## EX0 — the spec ✅
 
 This doc set, merged to `main` and attached to the epic with `orun spec push`.
 
@@ -12,7 +12,7 @@ This doc set, merged to `main` and attached to the epic with `orun spec push`.
 - the five documents are on `main`
 - `orun spec list --epic expirio-expiry-tracking` shows them
 
-## EX1 — the tracked item and its clock
+## EX1 — the tracked item and its clock ✅
 
 The `expiry` bounded context, invisible to the console. A migration adds
 `expiry_items` and `expiry_reminders` and registers them in the manifest and in
