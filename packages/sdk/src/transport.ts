@@ -150,7 +150,10 @@ export class Transport {
 
     let body: BodyInit | undefined;
     if (input.rawBody !== undefined) {
-      headers.set("content-type", input.contentType ?? "application/octet-stream");
+      // An empty contentType means "let the runtime set it" (FormData boundary).
+      if (input.contentType !== "") {
+        headers.set("content-type", input.contentType ?? "application/octet-stream");
+      }
       body = input.rawBody;
     } else if (input.body !== undefined) {
       headers.set("content-type", "application/json");
