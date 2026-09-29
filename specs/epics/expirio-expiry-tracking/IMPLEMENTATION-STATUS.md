@@ -6,9 +6,9 @@ code departed from `design.md`.
 | Milestone | State | PR |
 |---|---|---|
 | EX0 — the spec | ✅ merged | #8 |
-| EX1 — the tracked item and its clock | ✅ merged — but see departure 1: its audited writes 503'd on D1 until #10 | #9 |
-| EX2 — templates, the ladder, the scorecard | ✅ merged — but see the fix below: the owner rungs reached nobody on D1 until task EX-5 | #10, EX-5 |
-| EX3 — documents, the renewal link, the feed | built, PR open (task EX-4), stacked on #10 | #11 |
+| EX1 — the tracked item and its clock | ✅ merged — but see departure 1: its audited writes 503'd on D1 until #10; and fix 2: its routes answered 404 until EX-6 | #9, EX-6 |
+| EX2 — templates, the ladder, the scorecard | ✅ merged — but see fix 1: the owner rungs reached nobody on D1 until task EX-5; and fix 2 | #10, #13 (EX-5) |
+| EX3 — documents, the renewal link, the feed | ✅ merged — but see fix 2 | #12 (EX-4; #11 was its stacked first PR) |
 
 ## Departures from the design
 
@@ -78,3 +78,20 @@ code departed from `design.md`.
    version seeded UUIDs on both sides, which is how the bug hid.
    `apps/expiry-worker/component.yaml` is touched so the live worker picks up
    the new `packages/db`.
+2. **Every expiry route answered 404 on stage and prod (task EX-6).** EX1 (#9)
+   added the `expiry.item.*` actions to `packages/policy-engine`, but no PR
+   touched `apps/policy-worker/component.yaml` — neither EX1 nor the redeploy
+   lists of #10, #12 and #13 — and the deploy plan keys off each worker's own
+   `component.yaml` (runbook trap 17). So the live `policy-worker` on stage and
+   prod stayed on its 2026-09-23 04:52Z deploy with the baseline permission
+   table: its bundles contained `expiry.item.create` zero times, while the
+   expiry-worker bundles contained it four times. Every `expiry.*` check was
+   denied, and `authz.allowed()` turns a deny into `not_found`, so every item,
+   template, document, link and feed route answered 404 to everyone, owner
+   included. Stage D1 held zero `expiry_items` ever. **EX1–EX3 were marked
+   shipped while this was true;** the README's ✅ was recorded from green deploy
+   lanes and `/health`, not from a signed-in request to an expiry route. EX-6
+   touches `apps/policy-worker/component.yaml` so the plan redeploys it from
+   `main`. It ships nothing else: `packages/policy-engine`'s last change is
+   EX1's, and the only other package policy-worker imports, `packages/contracts`,
+   changed only in modules it does not import (`expiry`, `notifications`).

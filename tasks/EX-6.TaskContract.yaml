@@ -1,0 +1,13 @@
+apiVersion: orun.io/v1
+kind: TaskContract
+metadata:
+  name: EX-6
+spec:
+  goal: The live policy-worker on stage and prod carries the expiry.* actions EX1 added to packages/policy-engine, so the expiry routes stop answering 404 for everyone.
+  affects:
+    - default/expirio/policy-worker
+  doneWhen:
+    - the deployed policy-worker bundles on stage and prod contain expiry.item.create
+    - on stage a signed-in org owner creates an expiry item (201) and reads its reminder ladder
+    - on prod the expiry routes answer 401 unauthenticated, not 404
+  gates: []

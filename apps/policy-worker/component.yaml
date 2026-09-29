@@ -53,3 +53,4 @@ spec:
     runtime: cloudflare
 # ci: trigger full-component verification (orun v2.12.0 upgrade — PR #183)
 # orun: redeploy 04-workers 20260923T043440Z
+# orun: redeploy EX-6 — packages/policy-engine (the expiry.* actions EX1 added never reached the live worker)
