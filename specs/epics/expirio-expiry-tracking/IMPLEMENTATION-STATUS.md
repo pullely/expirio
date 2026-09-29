@@ -7,7 +7,7 @@ code departed from `design.md`.
 |---|---|---|
 | EX0 — the spec | ✅ merged | #8 |
 | EX1 — the tracked item and its clock | ✅ merged — but see departure 1: its audited writes 503'd on D1 until #10 | #9 |
-| EX2 — templates, the ladder, the scorecard | built, PR open (task EX-3) | #10 |
+| EX2 — templates, the ladder, the scorecard | ✅ merged — but see the fix below: the owner rungs reached nobody on D1 until task EX-5 | #10, EX-5 |
 | EX3 — documents, the renewal link, the feed | built, PR open (task EX-4), stacked on #10 | #11 |
 
 ## Departures from the design
@@ -62,3 +62,19 @@ code departed from `design.md`.
     (or `x-filename`), rather than multipart.
 11. **The feed looks back seven days,** so an item that lapsed this week is
     still on the calendar, and carries at most 500 entries.
+
+## Fixes after ship
+
+1. **The owner rung reached nobody (task EX-5).** `listOwnerEmails` joined
+   `identity_users u ON u.id = ra.subject_id`, but on D1 the membership tables
+   store the subject as the PUBLIC id (`usr_<32 hex>`) while `identity_users.id`
+   is the UUID, so the join matched nothing and the sweep marked every owner
+   rung (the 7-day and the day-of) `failed` for want of a recipient. A manager
+   or holder rung with nobody on file fell upward into the same hole. The join
+   now matches `u.id` against the subject id AND its UUID form (the leakbook
+   LB-6 fix, copied as is), so a UUID-shaped subject still resolves. The
+   real-SQLite test in `tests/db/src/sqlite-schema.test.ts` now seeds the
+   membership rows both ways; the `usr_` case fails on the old join. The first
+   version seeded UUIDs on both sides, which is how the bug hid.
+   `apps/expiry-worker/component.yaml` is touched so the live worker picks up
+   the new `packages/db`.

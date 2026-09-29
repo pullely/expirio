@@ -551,21 +551,29 @@ describe("the expiry sweep's queries, against a real SQLite engine (EX2)", () =>
     expect(after.ok && after.value.map((r) => r.offsetDays)).toEqual([60]);
   });
 
-  it("reads the org's active owners through membership and identity", async () => {
-    const userId = "78787878-7878-4878-8878-787878787878";
-    db.prepare(
-      "INSERT INTO identity_users (id, email, email_lower) VALUES (?, 'Owner@Clinic.test', 'owner@clinic.test')",
-    ).run(userId);
-    db.prepare(
-      "INSERT INTO membership_organization_members (id, org_id, subject_id) VALUES ('m1', ?, ?)",
-    ).run(orgId, userId);
-    db.prepare(
-      "INSERT INTO membership_role_assignments (id, org_id, subject_id, role) VALUES ('ra1', ?, ?, 'owner')",
-    ).run(orgId, userId);
-    const repo = createExpiryRepository(executor);
-    const owners = await repo.listOwnerEmails(orgId);
-    expect(owners).toEqual({ ok: true, value: ["owner@clinic.test"] });
-  });
+  // Membership rows as they are on D1: the subject is the PUBLIC id
+  // ("usr_<32 hex>"), while identity_users.id is the UUID. (The first version
+  // of this test used UUIDs on both sides and hid a join that matched nothing
+  // on stage, so the owner rung of the ladder reached nobody.)
+  it.each(["public", "uuid"] as const)(
+    "reads the org's active owners through membership and identity (subject stored as the %s id)",
+    async (subjectForm) => {
+      const userId = "78787878-7878-4878-8878-787878787878";
+      const subject = subjectForm === "public" ? `usr_${userId.replace(/-/g, "")}` : userId;
+      db.prepare(
+        "INSERT INTO identity_users (id, email, email_lower) VALUES (?, 'Owner@Clinic.test', 'owner@clinic.test')",
+      ).run(userId);
+      db.prepare(
+        "INSERT INTO membership_organization_members (id, org_id, subject_id) VALUES ('m1', ?, ?)",
+      ).run(orgId, subject);
+      db.prepare(
+        "INSERT INTO membership_role_assignments (id, org_id, subject_id, role) VALUES ('ra1', ?, ?, 'owner')",
+      ).run(orgId, subject);
+      const repo = createExpiryRepository(executor);
+      const owners = await repo.listOwnerEmails(orgId);
+      expect(owners).toEqual({ ok: true, value: ["owner@clinic.test"] });
+    },
+  );
 
   it("builds the scorecard and ages the overdue", async () => {
     const repo = createExpiryRepository(executor);

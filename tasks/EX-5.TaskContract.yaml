@@ -1,0 +1,14 @@
+apiVersion: orun.io/v1
+kind: TaskContract
+metadata:
+  name: EX-5
+spec:
+  goal: The owner rung of the escalation ladder reaches the organization's owner on D1, where membership rows carry the public usr_ subject id rather than the identity UUID.
+  affects:
+    - default/expirio/db
+    - default/expirio/db-tests
+    - default/expirio/expiry-worker
+  doneWhen:
+    - listOwnerEmails resolves an owner stored as usr_<hex> and one stored as a UUID, pinned by a real-SQLite test that fails on the old join
+    - on stage an item's 7-day owner rung is sent to the org owner's email and the notifications worker accepts it
+  gates: []
