@@ -1,11 +1,19 @@
 {
   "name": "Expirio Console",
   "short_name": "Expirio",
-  "description": "Control plane for your projects, environments, and entitlements.",
+  "description": "Never let a license, permit, insurance policy or certification lapse again",
   "start_url": "/orgs",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#09090b",
-  "theme_color": "#09090b",
-  "orientation": "portrait-primary"
+  "background_color": "#fdfcfc",
+  "theme_color": "#fdfcfc",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
 }
